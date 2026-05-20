@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_EXTENSION_VERSION": "~4",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "SQL_CONNECTION_STRING": "",
+    "__HINT_SQL_CONNECTION_STRING": "Server=tcp:{org}-{project}-sql-test.database.windows.net,1433;Database={org}-{project}-sqldb-test;User Id=sqladmin;Password=YOUR_SQL_PASSWORD;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+  }
+}

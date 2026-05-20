@@ -1,0 +1,34 @@
+{
+  "name": "azure-starter",
+  "version": "2.0.0",
+  "description": "Composable Claude skills for scaffolding and deploying consumption-priced, low-cost Azure web apps. Orchestrator + 13 single-purpose sub-skills covering Bicep, OIDC, SQL migrations, SWA, FC1, Container Apps + Jobs, Storage lifecycle, ACS Email, App Insights, multi-tenant, cost guardrails, troubleshooting, and a learnings-feedback loop. Complementary to Microsoft's azure-skills plugin.",
+  "author": {
+    "name": "Alex Pizarro",
+    "url": "https://github.com/alexpizarro"
+  },
+  "repository": "https://github.com/alexpizarro/claude-azure-app-starter",
+  "license": "MIT",
+  "keywords": [
+    "azure",
+    "static-web-apps",
+    "azure-functions",
+    "flex-consumption",
+    "container-apps",
+    "container-apps-jobs",
+    "azure-sql",
+    "azure-storage-lifecycle",
+    "application-insights",
+    "azure-communication-services",
+    "bicep",
+    "iac",
+    "oidc",
+    "ci-cd",
+    "react",
+    "typescript",
+    "deployment",
+    "low-cost",
+    "consumption",
+    "multi-tenant",
+    "cost-guardrails"
+  ]
+}

@@ -1,0 +1,177 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - production
+
+permissions:
+  id-token: write   # Required for OIDC login to Azure
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Production Environment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for git diff to work across multi-commit pushes
+
+      # -----------------------------------------------------------------------
+      # 1. Detect whether any infra/ files changed.
+      #    Steps 3 and 4 are skipped for frontend/API-only pushes, saving
+      #    3–5 minutes per run. Defaults to true on first push (all-zeros SHA).
+      # -----------------------------------------------------------------------
+      - name: Check for infra changes
+        id: changes
+        run: |
+          before="${{ github.event.before }}"
+          if [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            echo "infra_changed=true" >> $GITHUB_OUTPUT
+          else
+            changed=$(git diff --name-only "$before" "${{ github.sha }}")
+            if echo "$changed" | grep -qE '^infra/'; then
+              echo "infra_changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "infra_changed=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      # -----------------------------------------------------------------------
+      # 2. Login to Azure via OIDC — separate service principal from test,
+      #    so production credentials are never accessible from test pipelines.
+      # -----------------------------------------------------------------------
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID_PROD }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # -----------------------------------------------------------------------
+      # 3. Deploy infrastructure via Bicep
+      #    Skipped when no infra/ files changed.
+      # -----------------------------------------------------------------------
+      - name: Deploy Infrastructure (Bicep)
+        id: infra
+        if: steps.changes.outputs.infra_changed == 'true'
+        env:
+          SQL_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD_PROD }}
+        run: |
+          result=$(az deployment sub create \
+            --name "deploy-prod-${{ github.run_id }}" \
+            --location australiaeast \
+            --template-file infra/main.bicep \
+            --parameters @infra/environments/prod.parameters.json \
+            --parameters sqlAdminPassword="$SQL_PASSWORD" \
+            --query "properties.outputs" \
+            --output json)
+
+          SWA_TOKEN=$(echo "$result" | jq -r '.swaDeploymentToken.value')
+          SQL_FQDN=$(echo "$result"  | jq -r '.sqlServerFqdn.value')
+          SQL_DB=$(echo "$result"    | jq -r '.sqlDbName.value')
+
+          RG_NAME=$(echo "$result" | jq -r '.resourceGroupName.value')
+
+          # Mask the deployment token so it never appears in logs
+          echo "::add-mask::$SWA_TOKEN"
+
+          echo "swaToken=$SWA_TOKEN"             >> "$GITHUB_OUTPUT"
+          echo "sqlFqdn=$SQL_FQDN"               >> "$GITHUB_OUTPUT"
+          echo "sqlDb=$SQL_DB"                   >> "$GITHUB_OUTPUT"
+          echo "resourceGroupName=$RG_NAME"      >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
+      # 4. Run SQL migrations
+      #    Installs sqlcmd explicitly (not pre-installed on ubuntu-24.04),
+      #    manages the firewall rule manually, and runs all *.sql files in
+      #    alphabetical order. The trap ensures the firewall rule is removed
+      #    even if the step fails.
+      #    Skipped when no infra/ files changed.
+      # -----------------------------------------------------------------------
+      - name: Run SQL Migrations
+        if: steps.changes.outputs.infra_changed == 'true'
+        env:
+          SQL_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD_PROD }}
+        run: |
+          SQL_SERVER="${{ steps.infra.outputs.sqlFqdn }}"
+          SQL_DB="${{ steps.infra.outputs.sqlDb }}"
+          SQL_SERVER_NAME="${SQL_SERVER/.database.windows.net/}"
+          RG="${{ steps.infra.outputs.resourceGroupName }}"
+          RULE_NAME="github-runner-${{ github.run_id }}"
+
+          # Guarantee firewall rule removal on exit, even if the step fails
+          trap 'echo "Cleaning up firewall rule..."; az sql server firewall-rule delete \
+            --resource-group "$RG" --server "$SQL_SERVER_NAME" \
+            --name "$RULE_NAME" --yes 2>/dev/null || true' EXIT
+
+          # Install sqlcmd — not pre-installed on ubuntu-24.04 (ubuntu-latest)
+          # --batch --yes required: gpg cannot open /dev/tty in headless CI
+          # Pipe through sudo tee (not sudo gpg -o) to avoid permission issues
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+            | gpg --batch --yes --dearmor \
+            | sudo tee /usr/share/keyrings/microsoft-prod.gpg > /dev/null
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] \
+            https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod \
+            $(lsb_release -cs) main" \
+            | sudo tee /etc/apt/sources.list.d/mssql-release.list > /dev/null
+          sudo apt-get update -q
+          sudo ACCEPT_EULA=Y apt-get install -y -q mssql-tools18 unixodbc-dev
+          SQLCMD=/opt/mssql-tools18/bin/sqlcmd
+          "$SQLCMD" -? > /dev/null 2>&1 || { echo "ERROR: sqlcmd install failed"; exit 1; }
+
+          # Add runner IP to SQL firewall temporarily
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Adding firewall rule for $RUNNER_IP..."
+          az sql server firewall-rule create \
+            --resource-group "$RG" --server "$SQL_SERVER_NAME" \
+            --name "$RULE_NAME" \
+            --start-ip-address "$RUNNER_IP" --end-ip-address "$RUNNER_IP"
+
+          # Run all migration files in alphabetical order
+          for f in $(ls infra/sql/migrations/*.sql | sort); do
+            echo "Running migration: $f"
+            "$SQLCMD" -S "$SQL_SERVER" -d "$SQL_DB" \
+              -U sqladmin -P "$SQL_PASSWORD" -i "$f" -C
+          done
+          echo "All migrations completed successfully."
+
+      # -----------------------------------------------------------------------
+      # 5. Get SWA token for code-only deploys (Bicep was skipped).
+      #    Derives SWA name from parameter file so no hardcoding is needed.
+      #    No extra permissions required — OIDC login already grants access.
+      # -----------------------------------------------------------------------
+      - name: Get SWA token (code-only deploy)
+        id: swa_token_fallback
+        if: steps.changes.outputs.infra_changed == 'false'
+        run: |
+          ORG=$(jq -r '.parameters.org.value' infra/environments/prod.parameters.json)
+          PROJECT=$(jq -r '.parameters.project.value' infra/environments/prod.parameters.json)
+          SWA_NAME="${ORG}-${PROJECT}-swa-prod"
+          RG_NAME="${ORG}-${PROJECT}-rg-prod"
+          token=$(az staticwebapp secrets list \
+            --name "$SWA_NAME" \
+            --resource-group "$RG_NAME" \
+            --query "properties.apiKey" \
+            --output tsv)
+          echo "::add-mask::$token"
+          echo "swaToken=$token" >> $GITHUB_OUTPUT
+
+      # -----------------------------------------------------------------------
+      # 6. Deploy frontend + managed API functions in a single action.
+      #    Uses Bicep output token (step 3) when infra ran, fallback (step 5) otherwise.
+      #    The SWA action (via Oryx) builds both the React app and the
+      #    TypeScript Functions automatically.
+      # -----------------------------------------------------------------------
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.infra.outputs.swaToken || steps.swa_token_fallback.outputs.swaToken }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: frontend
+          output_location: dist
+          api_location: api
