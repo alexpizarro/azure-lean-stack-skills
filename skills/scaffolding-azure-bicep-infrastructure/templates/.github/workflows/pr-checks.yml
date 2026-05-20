@@ -1,0 +1,58 @@
+name: PR Checks
+
+# Runs on every PR targeting an environment branch.
+# Catches typecheck / build / test regressions BEFORE they hit a real Azure deploy.
+#
+# Pattern proven in trg-directory-website and trg-directory-content-crawl
+# (the latter has a Python+Docker variant; this file is the Node/npm shape
+# that matches the SWA + Functions stack scaffolded by Azure Lean Stack).
+
+on:
+  pull_request:
+    branches: [main, test, production]
+
+jobs:
+  build-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            api/package-lock.json
+
+      # ─── Frontend ───────────────────────────────────────────────────────────
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: npm run typecheck
+
+      # Tests are optional — remove this step or wire it up to your runner of
+      # choice. Vitest is the default for Vite projects.
+      - name: Unit tests (frontend)
+        working-directory: frontend
+        run: npm test --if-present
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # ─── API (Azure Functions) ──────────────────────────────────────────────
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci
+
+      - name: Typecheck API
+        working-directory: api
+        run: npm run typecheck
+
+      - name: Build API
+        working-directory: api
+        run: npm run build

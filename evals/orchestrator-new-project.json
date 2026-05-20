@@ -1,0 +1,38 @@
+{
+  "skill": "orchestrating-azure-deployments",
+  "query": "I want to build a new task manager web app on Azure. Help me set it up. Org: acme, project: taskapp, GitHub: acme/taskapp.",
+  "context": "Empty working directory. User has Azure CLI logged in to their subscription and gh CLI authenticated.",
+  "expected_behavior": [
+    "Claude routes to scaffolding-azure-bicep-infrastructure FIRST",
+    "Claude collects org, project, GitHub repo, and asks which optional components are needed (SQL? Storage? Observability?)",
+    "Claude generates files matching the per-skill templates/ structure (Bicep, workflows, frontend, api)",
+    "Claude then routes to configuring-azure-oidc-for-github-actions to set up SPs + federated credentials for the test and production branches",
+    "Claude explicitly mentions that main is for local dev and is NOT connected to an Azure environment",
+    "Claude runs applying-azure-cost-guardrails/scripts/audit-sku-overrides.sh on the generated Bicep BEFORE the first deploy"
+  ],
+  "ground_truth": {
+    "must_invoke": [
+      "scaffolding-azure-bicep-infrastructure",
+      "configuring-azure-oidc-for-github-actions",
+      "managing-azure-sql-migrations"
+    ],
+    "must_not_invoke": [
+      "deploying-fc1-flex-consumption-functions",
+      "deploying-azure-container-apps"
+    ],
+    "must_run_commands": [
+      "az ad sp create-for-rbac",
+      "az ad app federated-credential create",
+      "gh secret set"
+    ],
+    "must_avoid_commands": [
+      "az functionapp create --flexconsumption-location",
+      "az appservice plan create --sku FC1"
+    ],
+    "must_mention": [
+      "branch-per-environment",
+      "main is for local dev",
+      "{org}-{project}-{component}-{env}"
+    ]
+  }
+}

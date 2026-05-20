@@ -1,6 +1,6 @@
 ---
 name: deploying-azure-container-apps
-description: Deploys Docker containers to Azure Container Apps on the Consumption workload profile with scale-to-zero, multi-container sidecars, shared managed environments (one env, many apps), and Container Apps Jobs for run-to-completion workloads. Includes the request-timeout fix for SSE/WebSocket drops, secretref env-var pattern, GHCR vs ACR cost decision, and revision-restart for secret pickup. Use when SWA managed functions and FC1 don't fit — long-running servers, streaming, custom Docker runtimes, background batch jobs, or multi-process workloads with sidecars.
+description: Deploys Docker containers to Azure Container Apps with scale-to-zero, multi-container sidecars, shared managed environments, and Container Apps Jobs for batch workloads. Use when SWA + FC1 don't fit — long-running servers, WebSocket/SSE streaming, custom Docker runtimes, scheduled or queue-driven background jobs, or multi-process workloads with sidecars.
 ---
 
 # Deploying Azure Container Apps

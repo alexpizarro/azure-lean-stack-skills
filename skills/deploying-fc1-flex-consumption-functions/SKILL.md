@@ -7,6 +7,23 @@ description: Deploys standalone Azure Function Apps on Flex Consumption (FC1) fo
 
 Use FC1 when SWA managed functions don't fit: timer triggers, queue triggers, AI workloads, or anything that runs longer than 30 seconds.
 
+## Workflow checklist
+
+Copy this checklist and tick items off:
+
+```
+FC1 Flex Consumption provisioning:
+- [ ] Step 1: Confirm SP has User Access Administrator at the RG scope (needed for MI role assignments)
+- [ ] Step 2: Deploy storage account with the deployment container (storage-for-fc1.bicep)
+- [ ] Step 3: Deploy FC1 plan + Function App via Bicep (NEVER az CLI — it silently mis-creates the plan)
+- [ ] Step 4: Verify properties.sku == "FlexConsumption" with az functionapp show
+- [ ] Step 5: Confirm FUNCTIONS_WORKER_RUNTIME is NOT in app settings
+- [ ] Step 6: Confirm package.json has "main": "dist/index.js" + "type": "module" (FC1 = ESM)
+- [ ] Step 7: Confirm src/index.ts imports every function file with .js extensions
+- [ ] Step 8: Deploy code via Azure/functions-action@v1.5.2+; check log for "Detected function app sku: FlexConsumption"
+- [ ] Step 9: Wait up to 10 min for MI role assignment propagation if first call fails
+```
+
 ## Why this is hard
 
 Azure Flex Consumption (FC1) looks similar to deprecated Linux Consumption (Y1) in the portal but behaves completely differently:

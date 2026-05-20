@@ -1,6 +1,6 @@
 ---
 name: diagnosing-azure-deployment-failures
-description: Diagnoses Azure deployment failures against a catalogue of 37+ documented gotchas drawn from real projects — Bicep errors (BCP258, LocationNotAvailable), CI/CD failures (AADSTS70021, sqlcmd not found, gpg cannot open /dev/tty), Function App quirks (silent CLI fallback to wrong plan, FUNCTIONS_WORKER_RUNTIME forbidden on FC1), Container Apps issues (SSE drops at 4 min, secret not picked up without revision restart), ACS Email Bicep traps, and SQL serverless cold-start. For live diagnostics of a running app, delegates to Microsoft's azure-diagnostics + appinsights-instrumentation. Use when a deploy fails, a deployed app misbehaves, or a CI step errors.
+description: Matches Azure deploy / CI / runtime failures against 37+ documented gotchas with verified fixes (BCP258, AADSTS70021, sqlcmd-not-found, FC1-CLI-silent-fallback, ACS dataLocation quirks, SSE timeouts, and more). Delegates to Microsoft's azure-diagnostics for live log/metric queries. Use when a deploy fails, a deployed app misbehaves, or a CI step errors.
 ---
 
 # Diagnosing Azure Deployment Failures

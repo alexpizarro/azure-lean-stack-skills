@@ -1,6 +1,10 @@
-# CLAUDE.md — Azure Starter Plugin (v2)
+# CLAUDE.md — Azure Lean Stack (v2.1.0)
 
-A **Claude Code plugin** of composable skills for scaffolding and deploying consumption-priced, low-cost Azure web apps. One thin orchestrator + 13 single-purpose sub-skills + a learnings-feedback loop. Complementary to Microsoft's [azure-skills](https://github.com/microsoft/azure-skills) plugin.
+**Azure apps that cost nothing when nobody's using them.**
+
+A **Claude Code plugin** of composable skills for scaffolding and deploying consumption-priced, low-cost Azure web apps. One thin orchestrator + 14 single-purpose sub-skills + a learnings-feedback loop. Built around **branch-per-environment CI/CD** where each git branch maps 1:1 to an isolated Azure resource group. Complementary to Microsoft's [azure-skills](https://github.com/microsoft/azure-skills) plugin.
+
+Every pattern in here is **proven in at least one real production project** (see [RECIPES.md](RECIPES.md)). If no shipping project uses it, it doesn't get added.
 
 ---
 
@@ -18,12 +22,13 @@ A **Claude Code plugin** of composable skills for scaffolding and deploying cons
 │   │       ├── architecture-decisions.md
 │   │       └── stack-versions.md
 │   │
-│   ├── scaffolding-azure-bicep-infrastructure/    # Bicep root, modular toggles
-│   ├── configuring-azure-oidc-for-github-actions/ # SPs + federated creds + GH secrets
+│   ├── scaffolding-azure-bicep-infrastructure/    # Bicep root, modular toggles, pr-checks.yml
+│   ├── configuring-azure-oidc-for-github-actions/ # SPs + federated creds + GH secrets (branch-scoped)
 │   ├── managing-azure-sql-migrations/             # Migration system, sqlcmd runner
 │   ├── deploying-azure-static-web-apps/           # SWA + managed functions
 │   ├── deploying-fc1-flex-consumption-functions/  # FC1 (ARM REST, ESM, MI auth)
 │   ├── deploying-azure-container-apps/            # ACA + Jobs + sidecars + shared env
+│   ├── scheduling-with-azure-logic-apps-consumption/ # Logic Apps recurring trigger (~$0.22/mo)
 │   ├── optimizing-azure-blob-storage-cost/        # Lifecycle rules, CORS, tiers
 │   ├── adding-azure-communication-services-email/ # ACS Email + safeSend pattern
 │   ├── instrumenting-azure-app-insights/          # Workspace-based AI + dailyCap + alerts

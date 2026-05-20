@@ -1,6 +1,6 @@
 ---
 name: configuring-azure-oidc-for-github-actions
-description: Configures Azure OIDC federated credentials and GitHub Actions secrets for secret-less, branch-scoped deployments. Creates two service principals (test + production), adds federated credentials with the exact subject string Azure requires, generates SQL admin passwords, and sets the 6 GitHub secrets the deploy workflows need. Use when bootstrapping CI/CD for a new Azure project, adding a new environment to an existing project, or fixing AADSTS70021 federated credential mismatches.
+description: Sets up branch-scoped Azure OIDC for GitHub Actions — creates service principals, federated credentials bound to each branch's refs/heads/{branch}, generates SQL passwords, and sets GitHub secrets. Use when bootstrapping CI/CD, onboarding a new environment branch, or fixing AADSTS70021 subject mismatches.
 ---
 
 # Configuring Azure OIDC for GitHub Actions
@@ -12,6 +12,21 @@ Sets up secret-less Azure authentication for GitHub Actions. After running these
 - No client secrets stored in GitHub or in code
 - Branch-scoped: the `test` SP can't deploy to `production` and vice versa
 - Federated credential subject is bound to `refs/heads/{branch}` exactly — drift causes `AADSTS70021`
+
+## Workflow checklist
+
+Copy this checklist into your response and check items off as you complete them:
+
+```
+OIDC + GitHub Actions setup:
+- [ ] Step 1: Verify az login + gh auth login (and AZURE_CONFIG_DIR if shared machine)
+- [ ] Step 2: Confirm GitHub repo exists, branches (test, production) created
+- [ ] Step 3: Run scripts/create-sp-with-oidc.sh → creates test + prod SPs + federated creds
+- [ ] Step 4: Run scripts/generate-sql-password.sh → SQL admin passwords
+- [ ] Step 5: Run scripts/add-github-secrets.sh → 6 secrets set
+- [ ] Step 6: For each additional environment branch (acme-demo, customer-uat, etc.), re-run with that branch name
+- [ ] Step 7: First push to test → verify the workflow authenticates (no AADSTS70021)
+```
 
 ## Setup sequence
 

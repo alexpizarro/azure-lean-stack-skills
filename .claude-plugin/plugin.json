@@ -1,7 +1,8 @@
 {
-  "name": "azure-starter",
-  "version": "2.0.0",
-  "description": "Composable Claude skills for scaffolding and deploying consumption-priced, low-cost Azure web apps. Orchestrator + 13 single-purpose sub-skills covering Bicep, OIDC, SQL migrations, SWA, FC1, Container Apps + Jobs, Storage lifecycle, ACS Email, App Insights, multi-tenant, cost guardrails, troubleshooting, and a learnings-feedback loop. Complementary to Microsoft's azure-skills plugin.",
+  "name": "azure-lean-stack",
+  "version": "2.1.0",
+  "description": "Azure Lean Stack — Claude Code skills for building Azure web apps that cost nothing when nobody's using them and scale up cleanly when they do. 14 composable skills, 37+ documented gotchas, branch-per-environment CI/CD. Every pattern proven in a real production project. Complementary to Microsoft's azure-skills plugin.",
+  "tagline": "Azure apps that cost nothing when nobody's using them.",
   "author": {
     "name": "Alex Pizarro",
     "url": "https://github.com/alexpizarro"
@@ -10,11 +11,13 @@
   "license": "MIT",
   "keywords": [
     "azure",
+    "azure-lean-stack",
     "static-web-apps",
     "azure-functions",
     "flex-consumption",
     "container-apps",
     "container-apps-jobs",
+    "logic-apps-consumption",
     "azure-sql",
     "azure-storage-lifecycle",
     "application-insights",
@@ -23,12 +26,16 @@
     "iac",
     "oidc",
     "ci-cd",
+    "branch-per-environment",
     "react",
     "typescript",
     "deployment",
     "low-cost",
     "consumption",
+    "scale-to-zero",
     "multi-tenant",
-    "cost-guardrails"
+    "cost-guardrails",
+    "microsoft-consulting",
+    "power-platform-bridge"
   ]
 }

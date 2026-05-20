@@ -1,0 +1,40 @@
+{
+  "skill": "scaffolding-azure-bicep-infrastructure",
+  "query": "Scaffold infrastructure for a media-heavy app. Org: bravo, project: clipmgr. I'll need blob storage (for video uploads) and Application Insights for observability. SQL too. Production should alert ops@bravo.com on errors.",
+  "context": "Empty working directory. User has already run claude plugin install for azure-lean-stack.",
+  "expected_behavior": [
+    "Claude generates infra/main.bicep with deploySql=true, deployStorage=true, deployObservability=true",
+    "Claude routes to optimizing-azure-blob-storage-cost for the Storage module (lifecycle rules)",
+    "Claude routes to instrumenting-azure-app-insights for the App Insights module",
+    "The generated main.bicep wires alertEmail through to the App Insights module",
+    "The generated main.bicep applies per-env SKU: SWA Free in test, Standard in prod",
+    "The Storage module is configured with lifecycle rules (Hot→Cool@60d→Cold@180d), NOT tierToArchive",
+    "Claude does NOT generate a Function App at this stage (not requested)",
+    "Claude reminds the user that SWA location is hard-coded to eastasia"
+  ],
+  "ground_truth": {
+    "must_invoke": [
+      "scaffolding-azure-bicep-infrastructure",
+      "optimizing-azure-blob-storage-cost",
+      "instrumenting-azure-app-insights"
+    ],
+    "must_not_invoke": [
+      "deploying-fc1-flex-consumption-functions",
+      "scaffolding-multi-tenant-azure-apps"
+    ],
+    "must_have_in_bicep": [
+      "deploySql: true",
+      "deployStorage: true",
+      "deployObservability: true",
+      "dailyQuotaGb",
+      "tierToCool",
+      "tierToCold",
+      "swaLocation = 'eastasia'"
+    ],
+    "must_not_have_in_bicep": [
+      "tierToArchive",
+      "Premium_LRS",
+      "minReplicas: 1"
+    ]
+  }
+}

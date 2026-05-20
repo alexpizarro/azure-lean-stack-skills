@@ -16,6 +16,23 @@ Multi-tenant pattern with **one resource group per tenant on a shared subscripti
 | Multi-tenant SaaS where customers share a single DB | No — that's row-level multi-tenancy, not infra-level |
 | Different products for different customers | No — use per-product subscriptions instead |
 
+## Workflow checklist
+
+Copy this checklist and tick items off:
+
+```
+Onboarding a new tenant:
+- [ ] Step 1: Agree on the tenant slug (kebab-case, ≤20 chars, no Azure reserved words)
+- [ ] Step 2: Verify the derived storage account name fits (≤24 chars, alphanumeric) — provide override if not
+- [ ] Step 3: Copy infra/environments/prod.parameters.json → infra/environments/{tenant}.parameters.json
+- [ ] Step 4: Edit tenant slug + storageAccountName override if needed
+- [ ] Step 5: Create a new branch for this tenant if using branch-per-tenant (recommended for full isolation)
+- [ ] Step 6: Add OIDC SP + federated credential bound to the new branch (skill: configuring-azure-oidc-for-github-actions)
+- [ ] Step 7: Generate per-tenant SQL password + add as GitHub secret
+- [ ] Step 8: Push to the tenant branch → workflow provisions the isolated stack
+- [ ] Step 9: Verify per-tenant cost reporting: `az resource list --tag tenant=$SLUG -o table`
+```
+
 ## The core idea
 
 `main.bicep` accepts a `tenant` param. Default value matches your original (single-tenant) naming so the first deployment doesn't need to migrate anything:

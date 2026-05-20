@@ -1,6 +1,6 @@
 ---
 name: scaffolding-azure-bicep-infrastructure
-description: Generates the Bicep infrastructure files, parameter files, and GitHub Actions workflows for an Azure web app — modular by default with opt-in toggles for SQL, Storage, observability. Uses subscription-scoped main.bicep with the {org}-{project}-{component}-{env} naming formula and per-env SKU selection (Free in test, Standard in prod). Use when bootstrapping a new Azure project's IaC, adding a new module, or refactoring an existing main.bicep into the modular-toggle pattern.
+description: Generates a subscription-scoped Bicep stack + GitHub Actions workflows for an Azure web app, with opt-in module toggles (SQL, Storage, Observability) and the {org}-{project}-{component}-{env} naming formula. Use when bootstrapping a new Azure project's IaC, adding a Bicep module, or refactoring into the modular-toggle pattern.
 ---
 
 # Scaffolding Azure Bicep Infrastructure
@@ -11,6 +11,22 @@ Generates the Bicep + workflow files for a new Azure web app. Modular by default
 
 - New project: generate `infra/`, `infra/environments/`, `.github/workflows/`
 - Existing project: add a new module or refactor into the modular-toggle pattern
+
+## Workflow checklist
+
+Copy this checklist into your response and check items off as you complete them:
+
+```
+Azure Bicep scaffolding:
+- [ ] Step 1: Collect inputs (org, project, GitHub repo, components)
+- [ ] Step 2: Generate infra/main.bicep with modular toggles
+- [ ] Step 3: Generate infra/modules/ (resourceGroup, staticWebApp, sqlServer; add storage/observability/aca if toggled)
+- [ ] Step 4: Generate infra/environments/test.parameters.json + prod.parameters.json
+- [ ] Step 5: Generate .github/workflows/ (deploy-test.yml, deploy-prod.yml, pr-checks.yml)
+- [ ] Step 6: Generate infra/sql/migrations/000_migration_history.sql + 001_create_items_table.sql
+- [ ] Step 7: Verify naming consistency — every resource uses {org}-{project}-{component}-{env}
+- [ ] Step 8: Run cost-guardrails audit before first deploy (skill: applying-azure-cost-guardrails)
+```
 
 ## Before starting, collect
 

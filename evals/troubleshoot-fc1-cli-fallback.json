@@ -1,0 +1,34 @@
+{
+  "skill": "diagnosing-azure-deployment-failures",
+  "query": "My deploy succeeded but my Function App seems to be on the wrong plan. I see 'Detected function app sku: Consumption' in the GitHub Actions log instead of FlexConsumption. The az CLI command ran without errors.",
+  "context": "Project already deployed once. User trying to use FC1 for a timer-triggered AI workload. CLI command used: `az functionapp create --flexconsumption-location australiaeast ...`.",
+  "expected_behavior": [
+    "Claude immediately recognises this as gotcha #19 / #20 (az CLI silently falls back to Y1/Dynamic plan)",
+    "Claude explains that az functionapp create with --flexconsumption-location does NOT reliably create FC1 — it falls back to AustraliaEastLinuxDynamicPlan",
+    "Claude routes to deploying-fc1-flex-consumption-functions skill for the fix",
+    "Claude explicitly says the hosting plan cannot be migrated on an existing Function App — must delete and recreate",
+    "Claude offers to switch to either ARM REST API calls OR the Bicep template (templates/flexConsumption.bicep)",
+    "Claude warns that the FUNCTIONS_WORKER_RUNTIME app setting is FORBIDDEN on FC1 — verify it is not set",
+    "Claude does NOT recommend retrying the same az functionapp create command"
+  ],
+  "ground_truth": {
+    "must_invoke": [
+      "diagnosing-azure-deployment-failures",
+      "deploying-fc1-flex-consumption-functions"
+    ],
+    "must_mention": [
+      "silently falls back",
+      "delete and recreate",
+      "FUNCTIONS_WORKER_RUNTIME",
+      "ARM REST API",
+      "FlexConsumption"
+    ],
+    "must_avoid_commands": [
+      "az functionapp create --flexconsumption-location"
+    ],
+    "must_run_commands": [
+      "az functionapp show",
+      "az deployment group create"
+    ]
+  }
+}

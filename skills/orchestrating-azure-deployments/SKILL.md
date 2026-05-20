@@ -1,15 +1,23 @@
 ---
 name: orchestrating-azure-deployments
-description: Orchestrates end-to-end Azure web app deployments using consumption-priced, low-cost defaults — React + Functions + SQL with one git push. Routes work to specialised sub-skills for scaffolding, OIDC setup, SQL migrations, Static Web Apps, Flex Consumption, Container Apps, storage lifecycle, ACS email, App Insights, multi-tenant, cost guardrails, troubleshooting, and learnings curation. Composes with Microsoft's azure-skills plugin for live resource queries and diagnostics. Use when building or deploying a new Azure web app, setting up CI/CD, troubleshooting an Azure deployment, or evolving an existing app to FC1 or Container Apps.
+description: Routes Azure web app work (scaffold, deploy, troubleshoot, evolve) to the right Azure Lean Stack sub-skill. Built around branch-per-environment CI/CD where each git branch maps to one isolated Azure resource group via OIDC. Use when building or deploying a new Azure app, setting up GitHub Actions for Azure, troubleshooting a failed deploy, or adding FC1 / Container Apps / Logic Apps / multi-tenant patterns.
 ---
 
-# Orchestrating Azure Deployments
+# Orchestrating Azure Deployments (Azure Lean Stack)
 
-Thin router for Azure app deployments. Holds no domain knowledge of its own — every task is delegated to a single-purpose sub-skill or to Microsoft's azure-skills plugin.
+Thin router for Azure app deployments. Holds no domain knowledge of its own — every task is delegated to a single-purpose sub-skill or to Microsoft's `azure-skills` plugin.
 
-**Stack defaults:** React 19 + TypeScript | Azure Functions v4 (Node 22) | Azure SQL Serverless | Bicep IaC | GitHub Actions OIDC
+**Stack defaults:** React 19 + TypeScript | Azure Functions v4 (Node 22) | Azure SQL Serverless | Bicep IaC | GitHub Actions OIDC | **branch-per-environment**
 
 **Last verified:** May 2026
+
+---
+
+## The deployment model — branch-per-environment
+
+Before delegating anything else, internalise the deployment model. **One branch in the repo = one isolated Azure resource group.** `main` is never connected to Azure — it's for local dev only. `test` → test RG. `production` → prod RG. New branch + one OIDC credential = new isolated environment.
+
+This model is non-negotiable. Every sub-skill assumes it. See [references/architecture-decisions.md](references/architecture-decisions.md) decision #0 for the full rationale (and the OIDC subject lockdown that makes it safe).
 
 ---
 
@@ -31,6 +39,7 @@ Identify the user's task, then delegate. Never inline domain knowledge from a su
 | "Transactional email" / "ACS email" / "send email from Azure" | [adding-azure-communication-services-email](../adding-azure-communication-services-email/SKILL.md) |
 | "Add observability" / "App Insights" / "metric alerts" / "5xx alerts" | [instrumenting-azure-app-insights](../instrumenting-azure-app-insights/SKILL.md) |
 | "Multi-tenant" / "one RG per customer" / "per-tenant isolation" | [scaffolding-multi-tenant-azure-apps](../scaffolding-multi-tenant-azure-apps/SKILL.md) |
+| "Recurring trigger" / "schedule" / "Logic App" / "Power-Automate-like flow" / "ping every N minutes" | [scheduling-with-azure-logic-apps-consumption](../scheduling-with-azure-logic-apps-consumption/SKILL.md) |
 | "Reduce cost" / "audit SKUs" / "stay on free tier" / "consumption-only" | [applying-azure-cost-guardrails](../applying-azure-cost-guardrails/SKILL.md) |
 | "Deploy failed" / "diagnose this error" / "AADSTS70021" / "BCP258" / "LocationNotAvailable" | [diagnosing-azure-deployment-failures](../diagnosing-azure-deployment-failures/SKILL.md) |
 | "I learned something" / "promote a learning to gotchas" / "capture this lesson" | [curating-azure-deployment-learnings](../curating-azure-deployment-learnings/SKILL.md) |
@@ -84,7 +93,7 @@ If a deploy then fails, route to [diagnosing-azure-deployment-failures/SKILL.md]
 
 ## Deploy workflow
 
-Deployment is `merge + push`:
+Deployment is `merge + push` — always. `main` never deploys anywhere.
 
 ```bash
 # Deploy to test
@@ -93,8 +102,10 @@ git checkout test && git merge main -m "Promote to test: <summary>" && git push 
 # Deploy to production
 git checkout production && git merge test -m "Release to prod: <summary>" && git push origin production
 
-# Return to main
+# Return to main (local dev only — no Azure environment attached)
 git checkout main
 ```
 
 Watch progress: `gh run list --limit 4` then `gh run watch <run-id>`.
+
+**Need a new isolated environment?** (Customer demo, UAT, feature branch with its own Azure stack.) Create the branch, run [`configuring-azure-oidc-for-github-actions`](../configuring-azure-oidc-for-github-actions/SKILL.md) with the new branch name, push. Ten minutes end to end.
