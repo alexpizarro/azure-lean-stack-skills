@@ -6,6 +6,34 @@ A Claude Code skill pack for building React + Azure Functions + SQL web apps the
 
 ---
 
+## Quick start
+
+**Prerequisites:** [Claude Code](https://code.claude.com), [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) (`az login` done), [GitHub CLI](https://cli.github.com/) (`gh auth login` done), Node.js 22.
+
+```bash
+# 1. Install the plugin
+claude plugin install alexpizarro/claude-azure-app-starter
+
+# 2. Open an empty directory for your new project
+mkdir my-azure-app && cd my-azure-app && claude
+
+# 3. Ask Claude to scaffold:
+#    "Scaffold a new Azure web app. Org: acme. Project: taskapp. GitHub: acme/taskapp."
+
+# 4. After files are generated, ask Claude to set up CI/CD:
+#    "Set up Azure OIDC and GitHub secrets for this repo."
+
+# 5. Push to the test branch — first deploy in ~5 minutes
+git push origin test
+```
+
+That's it. Idle cost: ~$0. Light-traffic cost: ~$5/month. Full cost table below.
+
+> **Pin to a specific version** for stable installs across the v2 → v3 jump:
+> `claude plugin install alexpizarro/claude-azure-app-starter@v2.1.0`
+
+---
+
 ## Why this exists
 
 I burned out on vibe coding. Lovable, v0, Bolt — they all let me ship something that *looked* like a real app in an afternoon. The moment I tried to take any of them past PoC, the wheels came off. Bloated bundles. Hardcoded values everywhere. State management nobody could maintain. Dead on arrival as a real-world app.
@@ -56,39 +84,17 @@ A typical low-traffic prototype runs at **under $5/month total**.
 
 ---
 
-## Install
+## What Claude does under the hood
 
-```bash
-claude plugin install alexpizarro/claude-azure-app-starter
-```
+When you ask Claude to scaffold a new app, it routes through these sub-skills in order:
 
-Pin to a version if you want stability across the v2 → v3 transition:
-
-```bash
-claude plugin install alexpizarro/claude-azure-app-starter@v2.1.0
-```
-
----
-
-## Quickstart — scaffold a new app
-
-In an empty folder:
-
-```
-Claude, scaffold a new Azure web app:
-  org: acme
-  project: taskapp
-  repo: acme/taskapp
-```
-
-Claude routes through:
 1. [`scaffolding-azure-bicep-infrastructure`](skills/scaffolding-azure-bicep-infrastructure/SKILL.md) — generates `infra/`, `.github/workflows/`, parameter files
 2. [`configuring-azure-oidc-for-github-actions`](skills/configuring-azure-oidc-for-github-actions/SKILL.md) — creates service principals + federated credentials + GitHub secrets
 3. [`managing-azure-sql-migrations`](skills/managing-azure-sql-migrations/SKILL.md) — sets up the migration system
 4. [`deploying-azure-static-web-apps`](skills/deploying-azure-static-web-apps/SKILL.md) — generates the React + Functions code
 5. [`applying-azure-cost-guardrails`](skills/applying-azure-cost-guardrails/SKILL.md) — audits the Bicep for cost regressions before first deploy
 
-Then you `git push` to `test`. Test environment exists 5 minutes later.
+You don't have to invoke these by name. Describe what you want — *"scaffold an Azure app with SQL and storage"*, *"set up OIDC"*, *"add a recurring scheduler"* — and Claude picks the right sub-skill via [`orchestrating-azure-deployments`](skills/orchestrating-azure-deployments/SKILL.md).
 
 ---
 
