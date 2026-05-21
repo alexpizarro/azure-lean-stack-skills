@@ -1,5 +1,6 @@
 {
-  "name": "azure-lean-stack",
+  "name": "azure-lean-stack-skills",
+  "displayName": "Azure Lean Stack",
   "version": "2.1.0",
   "description": "Azure Lean Stack — Claude Code skills for building Azure web apps that cost nothing when nobody's using them and scale up cleanly when they do. 14 composable skills, 37+ documented gotchas, branch-per-environment CI/CD. Every pattern proven in a real production project. Complementary to Microsoft's azure-skills plugin.",
   "tagline": "Azure apps that cost nothing when nobody's using them.",
@@ -7,7 +8,7 @@
     "name": "Alex Pizarro",
     "url": "https://github.com/alexpizarro"
   },
-  "repository": "https://github.com/alexpizarro/claude-azure-app-starter",
+  "repository": "https://github.com/alexpizarro/azure-lean-stack-skills",
   "license": "MIT",
   "keywords": [
     "azure",

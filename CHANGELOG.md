@@ -81,7 +81,7 @@ Decomposed the single `azure-starter` skill into an orchestrator + 13 single-pur
 
 If you were on v1.0.0, no action required to keep using v1 — pin to `@v1.0.0` in your install command. To upgrade:
 
-1. `claude plugin install alexpizarro/claude-azure-app-starter@v2.0.0` (or `@latest`)
+1. `claude plugin install alexpizarro/azure-lean-stack-skills@v2.0.0` (or `@latest`)
 2. The old `/azure-starter scaffold` etc. argument-routed commands are gone. Instead, describe what you want naturally — Claude routes to the right sub-skill.
 3. If you generated a v1 project, its files are unchanged. The v2 plugin works with v1-shaped projects identically.
 

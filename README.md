@@ -12,7 +12,7 @@ A Claude Code skill pack for building React + Azure Functions + SQL web apps the
 
 ```bash
 # 1. Install the plugin
-claude plugin install alexpizarro/claude-azure-app-starter
+claude plugin install alexpizarro/azure-lean-stack-skills
 
 # 2. Open an empty directory for your new project
 mkdir my-azure-app && cd my-azure-app && claude
@@ -30,7 +30,7 @@ git push origin test
 That's it. Idle cost: ~$0. Light-traffic cost: ~$5/month. Full cost table below.
 
 > **Pin to a specific version** for stable installs across the v2 → v3 jump:
-> `claude plugin install alexpizarro/claude-azure-app-starter@v2.1.0`
+> `claude plugin install alexpizarro/azure-lean-stack-skills@v2.1.0`
 
 ---
 
@@ -175,7 +175,7 @@ This pack complements that with opinionated, proven patterns:
 | Scope | All of Azure, generically | The lean-cost SWA + Functions + SQL + ACA stack |
 | Strength | Live data via Azure MCP | Battle-tested CI/CD + gotcha catalogue |
 | Best for | "What's running in my subscription?" | "Why did my deploy fail?" / "How do I keep this under $5/month?" |
-| Installation | `microsoft/azure-skills` | `alexpizarro/claude-azure-app-starter` |
+| Installation | `microsoft/azure-skills` | `alexpizarro/azure-lean-stack-skills` |
 
 Install both. Claude Code uses Microsoft's for live diagnostics; Azure Lean Stack for the deployment patterns that aren't in Microsoft's official surface.
 
