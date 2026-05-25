@@ -46,8 +46,10 @@ Run the same scenario on:
 | Skill | Scenarios shipped | Scenarios target |
 |-------|------------------|------------------|
 | orchestrating-azure-deployments | 1 | 3 |
-| scaffolding-azure-bicep-infrastructure | 1 | 3 |
+| scaffolding-azure-bicep-infrastructure | 2 | 3 |
 | diagnosing-azure-deployment-failures | 1 | 3 |
+| developing-azure-apps-locally | 1 | 3 |
+| applying-azure-cost-guardrails | 1 | 3 |
 | (all others) | 0 | 3 |
 
 Adding more scenarios is a high-leverage contribution.

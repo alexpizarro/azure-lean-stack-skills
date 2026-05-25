@@ -1,0 +1,44 @@
+# Fully-offline local dev stack for an Azure Lean Stack app.
+#   - sql:     SQL Server 2022 — the same engine Azure SQL is built on. The amd64
+#              image runs on Apple Silicon via Docker Desktop Rosetta emulation
+#              (enable Settings -> General -> "Use Rosetta for x86/amd64 emulation").
+#              azure-sql-edge was retired 2025-09 and dropped arm64, so mssql/server
+#              is the supported, high-fidelity choice.
+#   - azurite: local Azure Blob emulator -> blobs served fully offline.
+#
+# Bring everything up (compose + migrations + CORS) with: bash scripts/up.sh
+#
+# Rename {project} below to your project slug before committing.
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: "{project}-sql"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "LocalDev_Pass123!"   # local-only; never used in Azure
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssqldata:/var/opt/mssql
+    healthcheck:
+      # mssql-tools18 sqlcmd needs -C (trust self-signed); fall back to v17 path.
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: "{project}-azurite"
+    command: "azurite-blob --blobHost 0.0.0.0 --location /data --skipApiVersionCheck"
+    ports:
+      - "10000:10000"
+    volumes:
+      - azuritedata:/data
+
+volumes:
+  mssqldata:
+  azuritedata:

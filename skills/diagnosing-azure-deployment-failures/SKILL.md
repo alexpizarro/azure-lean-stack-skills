@@ -55,6 +55,7 @@ Lookup-first triage against documented gotchas. If the symptom doesn't match a k
 | SWA self-referencing URL needed | `APP_BASE_URL` unknown before first deploy | Use `'https://${swa.properties.defaultHostname}'` |
 | Can't test before Azure provisioned | No mock pattern | Check `if (!process.env.KEY)` → return mock |
 | `local.settings.json` placeholder strings | Fake strings are truthy | Use `""` for all user-input values |
+| SQL Serverless bill higher than expected; DB never pauses | Health endpoint or scheduler polls the DB, keeping it awake 24/7 | DB-free shallow health check; or switch to flat Basic tier (~$5/mo). See cost-guardrails Guardrail #11 |
 
 For the full catalogue with explanations, see [references/gotchas.md](references/gotchas.md).
 

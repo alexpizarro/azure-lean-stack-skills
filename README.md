@@ -58,7 +58,7 @@ So I built this skill pack. **Azure Lean Stack.** Every pattern in here is prove
 ~3   real production projects that prove every pattern
 ```
 
-**One branch per environment** — push to `test` → test env; push to `production` → prod env; `main` stays disconnected for local dev. No GitHub Environments to configure, no deploy approvals to set up, no manual `terraform apply` from a laptop.
+**Local → test → prod, one branch per tier** — `main` runs a fully-offline local stack (Docker SQL + Azurite, no Azure cost); push to `test` → test env; push to `production` → prod env. No GitHub Environments to configure, no deploy approvals to set up, no manual `terraform apply` from a laptop.
 
 **Free tier by default** — Static Web Apps Free, SQL Serverless with auto-pause, Container Apps scale-to-zero, Application Insights with daily quota cap, Storage with lifecycle rules. Pay for what you actually use.
 
@@ -119,7 +119,7 @@ Need a new isolated environment? `git checkout -b acme-demo`, set up one OIDC fe
 
 ---
 
-## The 14 skills
+## The 16 skills
 
 | Skill | When Claude uses it |
 |-------|--------------------|
@@ -131,6 +131,7 @@ Need a new isolated environment? `git checkout -b acme-demo`, set up one OIDC fe
 | [`deploying-fc1-flex-consumption-functions`](skills/deploying-fc1-flex-consumption-functions/SKILL.md) | Timer/queue/AI workloads on standalone Function Apps |
 | [`deploying-azure-container-apps`](skills/deploying-azure-container-apps/SKILL.md) | Long-running servers, Jobs, sidecars, multi-app envs |
 | [`scheduling-with-azure-logic-apps-consumption`](skills/scheduling-with-azure-logic-apps-consumption/SKILL.md) | Recurring HTTP triggers and lightweight Power-Automate-style flows |
+| [`developing-azure-apps-locally`](skills/developing-azure-apps-locally/SKILL.md) | Fully-offline local stack (Docker SQL + Azurite) — the `main`-branch "try" tier |
 | [`optimizing-azure-blob-storage-cost`](skills/optimizing-azure-blob-storage-cost/SKILL.md) | Lifecycle rules, CORS for SAS+Range, tier ageing |
 | [`adding-azure-communication-services-email`](skills/adding-azure-communication-services-email/SKILL.md) | Transactional email (100/day free) |
 | [`instrumenting-azure-app-insights`](skills/instrumenting-azure-app-insights/SKILL.md) | Workspace-based App Insights with daily cap + alerts |
@@ -145,14 +146,16 @@ See [`RECIPES.md`](RECIPES.md) for working patterns lifted from real projects.
 
 ## Branch-per-environment — the deployment model
 
-This is the single most important pattern in the pack. **One branch in your repo = one isolated Azure environment.**
+This is the single most important pattern in the pack. **One branch in your repo = one tier.** The flow is **local (`main`) → `test` → `production`.**
 
 ```
-main         → not deployed anywhere (local dev only)
+main         → the local "try" tier — fully-offline Docker stack (SQL + Azurite), no Azure
 test         → deploys to {org}-{project}-rg-test
 production   → deploys to {org}-{project}-rg-prod
 acme-demo    → deploys to {org}-{project}-rg-acme-demo
 ```
+
+You iterate on `main` against a real local SQL + blob stack (see [`developing-azure-apps-locally`](skills/developing-azure-apps-locally/SKILL.md)), then promote to `test`, then `production`.
 
 Why this works:
 - **Branch state IS environment state.** Always. The branch is the source of truth for what's running.

@@ -21,6 +21,17 @@ Lightweight recurring triggers on Azure. Consumption tier bills per action (~$0.
 - **Workflows requiring premium connectors.** Some connectors (Salesforce, SAP) carry a per-execution surcharge that changes the cost model.
 - **Sub-minute cadence.** Logic Apps minimum recurrence is 1 minute. For sub-minute, use Functions timer triggers or Container Apps.
 
+## ⚠️ Cost warning — don't point a frequent scheduler at a DB-backed endpoint
+
+A recurring scheduler that hits an endpoint which queries a **SQL Serverless** database resets the DB's auto-pause timer on every run. At a 5-minute cadence the DB never pauses and bills compute 24/7 — the Logic App costs $0.22/mo, but the kept-awake database can cost far more.
+
+**Proven failure:** `trg-directory-website`'s recrawl scheduler polled an endpoint that read `recrawl_queue` every 5 minutes, keeping the serverless DB awake (see [applying-azure-cost-guardrails](../applying-azure-cost-guardrails/SKILL.md) Guardrail #11).
+
+Before wiring a scheduler to an app endpoint, confirm:
+- The target endpoint is **DB-free** (e.g. the shallow `/api/health`), or
+- The work genuinely needs the DB on every run AND you've accepted always-on cost → switch the DB to **flat Basic tier** (~$5/mo, cheaper than kept-awake serverless), or
+- The cadence is infrequent enough that the DB still pauses between runs (interval > `autoPauseDelay`).
+
 ## Cost reality check
 
 ```

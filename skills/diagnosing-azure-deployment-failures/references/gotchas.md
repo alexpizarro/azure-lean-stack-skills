@@ -99,6 +99,14 @@ Every deployment issue encountered across real projects, with verified fixes. Ad
 
 ---
 
+## Cost
+
+| # | Problem | Cause | Fix |
+|---|---------|-------|-----|
+| 40 | SQL Serverless bill far higher than expected; DB never auto-pauses | A health/status endpoint or a frequent scheduler queries the DB on every call, resetting the auto-pause timer → DB stays awake, billing compute 24/7 | Make the shallow health check DB-free (return 200 without a query; gate any DB check behind `?deep=1`); point schedulers at DB-free endpoints; if access is genuinely steady, switch serverless → flat Basic tier (~$5/mo). Detect with `applying-azure-cost-guardrails/scripts/audit-cost-antipatterns.sh`. See cost-guardrails Guardrail #11. |
+
+---
+
 ## General rules
 
 1. **Template and architecture must stay in sync.** When the canonical template changes, update the sub-skill docs in the same commit.

@@ -6,6 +6,30 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/) a
 
 ---
 
+## [2.2.0] — 2026-05-26
+
+### Added
+
+- **New skill:** [`developing-azure-apps-locally`](skills/developing-azure-apps-locally/SKILL.md) — a fully-offline local dev stack (Docker SQL Server 2022 + Azurite) as the `main`-branch "try" tier of the **local → test → prod** flow. One-command bootstrap (`up.sh`), idempotent local `migrate.sh`, optional `seed-from-test.sh`, Azurite `cors.sh`, a `docker-compose.yml` + `local.settings.json.example`, and an `offline-stack.md` reference (Rosetta/amd64, endpoint-aware SAS URLs, mock mode, `dev:test` trade-off). Proven by `bc-videohub-lite` (`docs/LOCAL-DEV.md`, `scripts/local-dev/*`).
+- **Cost Guardrail #11 — "Don't let polling defeat scale-to-zero"** in [`applying-azure-cost-guardrails`](skills/applying-azure-cost-guardrails/SKILL.md): the mechanism (a health endpoint / scheduler that touches the DB keeps SQL Serverless awake 24/7), the serverless-vs-flat-Basic decision rule, and an **advisory-triggers** table telling Claude to warn the user *before* implementing a health endpoint / uptime check / keep-alive / DB-reading scheduler / `minReplicas: 1`.
+- **New detection script** [`audit-cost-antipatterns.sh`](skills/applying-azure-cost-guardrails/scripts/audit-cost-antipatterns.sh) — greps app source for DB-querying health/status endpoints and frequent schedulers; exits non-zero so it can gate CI. Validated against the real `trg-directory-website` `status.ts`.
+- **Shallow health-check pattern** in [`deploying-azure-static-web-apps`](skills/deploying-azure-static-web-apps/SKILL.md): DB-free `/api/health`, DB check gated behind `?deep=1`.
+- **Gotcha #40** (Cost): "SQL Serverless bill higher than expected; DB never pauses" → cause + fix.
+- **Scheduler cost warning** in [`scheduling-with-azure-logic-apps-consumption`](skills/scheduling-with-azure-logic-apps-consumption/SKILL.md) — don't point a frequent recurrence at a DB-backed endpoint.
+- **2 eval scenarios:** `developing-locally.json`, `cost-antipattern-healthcheck.json`.
+
+### Changed
+
+- **Branch model is now explicitly local → test → prod.** Architecture Decision #0 reframes `main` from "local dev only" to the fully-offline "try" tier backed by `developing-azure-apps-locally`. README and orchestrator routing updated.
+- `plugin.json` → `2.2.0`; 16 skills; keywords `local-development`, `azurite`, `offline-stack`.
+
+### Proven sources
+
+- `bc-videohub-lite` — the offline local stack, and the serverless→Basic tier switch (2026-05-23, ~10× cheaper at steady low usage).
+- `trg-directory-website` — the cost-overrun cause (`status.ts` queried the DB on every health call while a 5-min scheduler polled it).
+
+---
+
 ## [2.1.0] — 2026-05-21
 
 ### Added

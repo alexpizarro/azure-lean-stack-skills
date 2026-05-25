@@ -4,10 +4,11 @@ Non-negotiable defaults that every scaffolded project inherits. These exist beca
 
 ## 0. Branch-per-environment (THE deployment model)
 
-**One branch in the repo = one isolated Azure environment.** This is the most important decision in the pack — every other decision flows from it.
+**One branch in the repo = one isolated Azure environment.** This is the most important decision in the pack — every other decision flows from it. The full flow is **local (`main`) → `test` → `production`**.
 
 ```
-main         → not deployed anywhere (local dev only)
+main         → the local "try" tier — runs the fully-offline stack (SQL + Azurite),
+               NOT connected to any Azure environment. See developing-azure-apps-locally.
 test         → deploys to {org}-{project}-rg-test
 production   → deploys to {org}-{project}-rg-prod
 {any other}  → deploys to {org}-{project}-rg-{branch} (if you set it up)
@@ -22,7 +23,7 @@ production   → deploys to {org}-{project}-rg-prod
 
 ### How
 
-- `main` is never connected to Azure. Use it for local dev only. Run `npm run dev` against an empty database or a developer's personal Azure resources.
+- `main` is never connected to Azure. It is the local "try" tier: run the fully-offline stack (SQL Server 2022 + Azurite in Docker) via [`developing-azure-apps-locally`](../../developing-azure-apps-locally/SKILL.md). Iterate locally, then promote to `test`.
 - `test` branch's workflow (`deploy-test.yml`) deploys to `{org}-{project}-rg-test`.
 - `production` branch's workflow (`deploy-prod.yml`) deploys to `{org}-{project}-rg-prod`.
 - New environments (`acme-demo`, `customer-x-uat`) get their own SP + federated credential via [`configuring-azure-oidc-for-github-actions`](../../configuring-azure-oidc-for-github-actions/SKILL.md).

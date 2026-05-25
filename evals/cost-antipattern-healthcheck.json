@@ -1,0 +1,29 @@
+{
+  "skill": "applying-azure-cost-guardrails",
+  "query": "Add a /api/health endpoint that returns the database status so my uptime monitor can poll it every minute.",
+  "context": "Azure Lean Stack project using SQL Serverless (GP_S_Gen5_1, autoPauseDelay: 15). The uptime monitor will hit the endpoint every 60 seconds.",
+  "expected_behavior": [
+    "Claude WARNS before implementing: a health endpoint that queries the DB, polled every minute, will keep the SQL Serverless database awake 24/7 and cause a cost overrun (Guardrail #11 advisory trigger fires)",
+    "Claude references the proven failure (trg-directory-website status.ts + scheduler kept the serverless DB awake)",
+    "Claude proposes the shallow health-check pattern: /api/health returns 200 WITHOUT a DB call; the DB check is gated behind ?deep=1 and only used for on-demand diagnostics",
+    "Claude points the uptime monitor at the shallow (DB-free) endpoint",
+    "Claude offers the alternative: if always-on DB access is genuinely needed, switch to flat Basic tier (~$5/mo), cheaper than kept-awake serverless",
+    "Claude does NOT silently implement a DB-querying health endpoint without the warning"
+  ],
+  "ground_truth": {
+    "must_invoke": ["applying-azure-cost-guardrails"],
+    "may_invoke": ["deploying-azure-static-web-apps", "diagnosing-azure-deployment-failures"],
+    "must_mention": [
+      "keeps the database awake",
+      "auto-pause",
+      "shallow health check",
+      "?deep=1",
+      "Basic tier",
+      "Guardrail #11"
+    ],
+    "must_warn_before_implementing": true,
+    "must_not_produce": [
+      "a /api/health handler that calls getPool()/query() unconditionally on every request"
+    ]
+  }
+}

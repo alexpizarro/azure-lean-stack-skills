@@ -1,0 +1,29 @@
+{
+  "skill": "developing-azure-apps-locally",
+  "query": "I want to run this Azure app offline on my machine before deploying — a real local database and blob storage, not just mocks. Set me up.",
+  "context": "A scaffolded Azure Lean Stack project (React frontend + Azure Functions api/ + infra/sql/migrations/). Docker Desktop is installed. macOS on Apple Silicon.",
+  "expected_behavior": [
+    "Claude routes to developing-azure-apps-locally",
+    "Claude provides the docker-compose stack (SQL Server 2022 + Azurite), NOT a cloud deploy",
+    "Claude copies templates/docker-compose.yml to repo root and templates/local.settings.json.example to api/local.settings.json",
+    "Claude runs (or instructs) bash scripts/up.sh to bring up SQL + Azurite, apply migrations, set Azurite CORS",
+    "Claude notes the Apple-Silicon Rosetta requirement for the amd64 SQL Server image",
+    "Claude explains main = local 'try' tier; promote to test/production via branch push",
+    "Claude leaves external-service keys empty so functions run in mock mode; does NOT put real Azure credentials in local.settings.json",
+    "Claude does NOT run az login / az deployment / create any Azure resources"
+  ],
+  "ground_truth": {
+    "must_invoke": ["developing-azure-apps-locally"],
+    "must_not_invoke": ["configuring-azure-oidc-for-github-actions", "deploying-azure-static-web-apps"],
+    "must_mention": [
+      "docker compose",
+      "Azurite",
+      "SQL Server 2022",
+      "Rosetta",
+      "local → test → prod",
+      "mock mode"
+    ],
+    "must_run_commands": ["docker compose up", "scripts/up.sh"],
+    "must_avoid_commands": ["az login", "az deployment sub create", "az group create"]
+  }
+}

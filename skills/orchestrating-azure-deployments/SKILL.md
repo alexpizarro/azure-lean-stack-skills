@@ -40,6 +40,7 @@ Identify the user's task, then delegate. Never inline domain knowledge from a su
 | "Add observability" / "App Insights" / "metric alerts" / "5xx alerts" | [instrumenting-azure-app-insights](../instrumenting-azure-app-insights/SKILL.md) |
 | "Multi-tenant" / "one RG per customer" / "per-tenant isolation" | [scaffolding-multi-tenant-azure-apps](../scaffolding-multi-tenant-azure-apps/SKILL.md) |
 | "Recurring trigger" / "schedule" / "Logic App" / "Power-Automate-like flow" / "ping every N minutes" | [scheduling-with-azure-logic-apps-consumption](../scheduling-with-azure-logic-apps-consumption/SKILL.md) |
+| "Run locally" / "offline" / "docker" / "local SQL" / "Azurite" / "seed local data" / "set up dev environment" | [developing-azure-apps-locally](../developing-azure-apps-locally/SKILL.md) |
 | "Reduce cost" / "audit SKUs" / "stay on free tier" / "consumption-only" | [applying-azure-cost-guardrails](../applying-azure-cost-guardrails/SKILL.md) |
 | "Deploy failed" / "diagnose this error" / "AADSTS70021" / "BCP258" / "LocationNotAvailable" | [diagnosing-azure-deployment-failures](../diagnosing-azure-deployment-failures/SKILL.md) |
 | "I learned something" / "promote a learning to gotchas" / "capture this lesson" | [curating-azure-deployment-learnings](../curating-azure-deployment-learnings/SKILL.md) |

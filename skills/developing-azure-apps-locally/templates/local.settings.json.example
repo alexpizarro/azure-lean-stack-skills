@@ -1,0 +1,20 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "FUNCTIONS_EXTENSION_VERSION": "~4",
+
+    "SQL_CONNECTION_STRING": "Server=localhost,1433;Database={project};User Id=sa;Password=LocalDev_Pass123!;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;",
+
+    "STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;",
+
+    "JWT_SECRET": "dev-secret-change-me",
+    "ADMIN_API_KEY": "dev-admin-key",
+    "APP_URL": "http://localhost:5173",
+
+    "__HINT_SQL_CONNECTION_STRING": "Points at local Docker SQL (TrustServerCertificate=True for the self-signed dev cert). In Azure this is injected from the SQL_ADMIN_PASSWORD secret at deploy time.",
+    "__HINT_STORAGE_CONNECTION_STRING": "Azurite well-known PUBLIC dev account+key — safe to commit; works only against the local emulator.",
+    "__HINT_EXTERNAL_KEYS": "Leave external-service keys (email, AI, ACS) EMPTY so functions fall back to mock mode locally. Never put real Azure credentials here."
+  }
+}

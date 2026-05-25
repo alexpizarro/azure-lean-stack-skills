@@ -135,6 +135,32 @@ if (process.env.SQL_CONNECTION_STRING) {
 }
 ```
 
+For a full offline stack (real local SQL + blob storage, not just mocks), use [developing-azure-apps-locally](../developing-azure-apps-locally/SKILL.md) — a Docker SQL Server 2022 + Azurite stack with a one-command bootstrap. Mock mode (above) covers external services you don't want to run locally (AI, email); the offline stack covers the DB + storage your app actually needs.
+
+## Shallow health check (avoid a costly anti-pattern)
+
+If you add a health/status endpoint, make the default check **DB-free** — return `200` without querying the database. A health endpoint that runs a DB query on every call, combined with any uptime monitor or scheduler polling it, keeps a SQL Serverless database permanently awake and bills compute 24/7 (see [applying-azure-cost-guardrails](../applying-azure-cost-guardrails/SKILL.md) Guardrail #11).
+
+```typescript
+// GET /api/health — shallow, DB-free. Safe to poll frequently.
+export async function health(req: HttpRequest): Promise<HttpResponseInit> {
+  const deep = req.query.get('deep') === '1';
+  if (!deep) {
+    return { status: 200, jsonBody: { ok: true } };   // no DB call — won't wake serverless
+  }
+  // Deep check runs the DB query only on explicit request (e.g. a manual probe).
+  try {
+    await getPool();
+    return { status: 200, jsonBody: { ok: true, db: 'ok' } };
+  } catch (e) {
+    return { status: 503, jsonBody: { ok: false, db: 'error' } };
+  }
+}
+app.http('health', { methods: ['GET'], authLevel: 'anonymous', route: 'health', handler: health });
+```
+
+Point uptime monitors and schedulers at `/api/health` (shallow); reserve `/api/health?deep=1` for on-demand diagnostics. Proven: `trg-directory-website`'s `status.ts` queried the DB on every call and a 5-min scheduler hit it, defeating auto-pause.
+
 ## `staticwebapp.config.json`
 
 ```json

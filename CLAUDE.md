@@ -1,4 +1,4 @@
-# CLAUDE.md — Azure Lean Stack (v2.1.0)
+# CLAUDE.md — Azure Lean Stack (v2.2.0)
 
 **Azure apps that cost nothing when nobody's using them.**
 
@@ -29,6 +29,7 @@ Every pattern in here is **proven in at least one real production project** (see
 │   ├── deploying-fc1-flex-consumption-functions/  # FC1 (ARM REST, ESM, MI auth)
 │   ├── deploying-azure-container-apps/            # ACA + Jobs + sidecars + shared env
 │   ├── scheduling-with-azure-logic-apps-consumption/ # Logic Apps recurring trigger (~$0.22/mo)
+│   ├── developing-azure-apps-locally/             # Fully-offline local stack (Docker SQL + Azurite)
 │   ├── optimizing-azure-blob-storage-cost/        # Lifecycle rules, CORS, tiers
 │   ├── adding-azure-communication-services-email/ # ACS Email + safeSend pattern
 │   ├── instrumenting-azure-app-insights/          # Workspace-based AI + dailyCap + alerts
