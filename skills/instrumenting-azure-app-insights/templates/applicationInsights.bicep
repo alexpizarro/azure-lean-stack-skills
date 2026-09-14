@@ -35,7 +35,7 @@ var componentName  = '${baseName}-ai-${environment}'
 var actionGroupName = '${baseName}-alerts-${environment}'
 var createAlerts = !empty(alertEmail)
 
-resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+resource workspace 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   name: workspaceName
   location: location
   tags: tags
@@ -69,7 +69,7 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = if (createAl
   location: 'global'
   tags: tags
   properties: {
-    groupShortName: substring('${baseName}alert', 0, 12)
+    groupShortName: substring('${baseName}alert', 0, min(length('${baseName}alert'), 12))   // ≤12 chars; substring() fails if the source is shorter
     enabled: true
     emailReceivers: [
       {

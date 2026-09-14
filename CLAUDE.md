@@ -1,8 +1,8 @@
-# CLAUDE.md — Azure Lean Stack (v2.2.0)
+# CLAUDE.md — Azure Lean Stack (v2.3.0)
 
 **Azure apps that cost nothing when nobody's using them.**
 
-A **Claude Code plugin** of composable skills for scaffolding and deploying consumption-priced, low-cost Azure web apps. One thin orchestrator + 14 single-purpose sub-skills + a learnings-feedback loop. Built around **branch-per-environment CI/CD** where each git branch maps 1:1 to an isolated Azure resource group. Complementary to Microsoft's [azure-skills](https://github.com/microsoft/azure-skills) plugin.
+A **Claude Code plugin** of composable skills for scaffolding and deploying consumption-priced, low-cost Azure web apps. One thin orchestrator + 16 single-purpose sub-skills + a learnings-feedback loop. Built around **branch-per-environment CI/CD** where each git branch maps 1:1 to an isolated Azure resource group. Complementary to Microsoft's [azure-skills](https://github.com/microsoft/azure-skills) plugin.
 
 Every pattern in here is **proven in at least one real production project** (see [RECIPES.md](RECIPES.md)). If no shipping project uses it, it doesn't get added.
 
@@ -13,7 +13,7 @@ Every pattern in here is **proven in at least one real production project** (see
 ```
 .
 ├── .claude-plugin/
-│   └── plugin.json                                # Plugin manifest (v2.0.0)
+│   └── plugin.json                                # Plugin manifest (v2.3.0)
 ├── skills/
 │   ├── orchestrating-azure-deployments/           # ORCHESTRATOR — routes to sub-skills
 │   │   ├── SKILL.md
@@ -22,20 +22,21 @@ Every pattern in here is **proven in at least one real production project** (see
 │   │       ├── architecture-decisions.md
 │   │       └── stack-versions.md
 │   │
-│   ├── scaffolding-azure-bicep-infrastructure/    # Bicep root, modular toggles, pr-checks.yml
-│   ├── configuring-azure-oidc-for-github-actions/ # SPs + federated creds + GH secrets (branch-scoped)
+│   ├── scaffolding-azure-bicep-infrastructure/    # Bicep root (SQL/Storage/Observability toggles), 3 workflows, sqlcmd installer
+│   ├── configuring-azure-oidc-for-github-actions/ # SPs + federated creds + GH secrets (branch-scoped, azure/login@v3)
 │   ├── managing-azure-sql-migrations/             # Migration system, sqlcmd runner
 │   ├── deploying-azure-static-web-apps/           # SWA + managed functions
-│   ├── deploying-fc1-flex-consumption-functions/  # FC1 (ARM REST, ESM, MI auth)
-│   ├── deploying-azure-container-apps/            # ACA + Jobs + sidecars + shared env
+│   ├── deploying-fc1-flex-consumption-functions/  # FC1 (Bicep/ARM REST, CommonJS, az-CLI zip deploy, MI host storage)
+│   ├── deploying-azure-container-apps/            # ACA + Jobs + sidecars + shared env + KEDA cron + retirement checklist
 │   ├── scheduling-with-azure-logic-apps-consumption/ # Logic Apps recurring trigger (~$0.22/mo)
 │   ├── developing-azure-apps-locally/             # Fully-offline local stack (Docker SQL + Azurite)
 │   ├── optimizing-azure-blob-storage-cost/        # Lifecycle rules, CORS, tiers
 │   ├── adding-azure-communication-services-email/ # ACS Email + safeSend pattern
 │   ├── instrumenting-azure-app-insights/          # Workspace-based AI + dailyCap + alerts
+│   ├── securing-azure-sql-and-storage-with-managed-identity/ # Entra SQL auth + user-delegation SAS via MI (flag-gated)
 │   ├── scaffolding-multi-tenant-azure-apps/       # One RG per tenant pattern
-│   ├── applying-azure-cost-guardrails/            # Consumption-first defaults + audit
-│   ├── diagnosing-azure-deployment-failures/      # 37+ gotcha catalogue
+│   ├── applying-azure-cost-guardrails/            # 15 guardrails, 3 audit scripts, costGuardrails.bicep (budget + stuck-warm alert)
+│   ├── diagnosing-azure-deployment-failures/      # 56-entry gotcha catalogue
 │   └── curating-azure-deployment-learnings/       # META: learnings → gotchas pipeline
 │       ├── SKILL.md
 │       └── scripts/
@@ -43,7 +44,9 @@ Every pattern in here is **proven in at least one real production project** (see
 │           ├── review-learnings.sh
 │           └── promote-to-gotchas.sh
 │
-└── learnings/                                     # Staging area (gitignored)
+├── evals/                                         # Review-spec scenarios (JSON) — no runner yet
+├── CHANGELOG.md · RECIPES.md · README.md
+└── learnings/                                     # Private field notes (gitignored — only promoted gotcha rows are shared)
     └── YYYY-MM-DD_{project}.md                   # With frontmatter (project, severity, tags)
 ```
 
@@ -61,10 +64,11 @@ Each skill has gerund-form `name:` + a description tuned for discovery. Claude s
 3. `managing-azure-sql-migrations` → migration system + sqlcmd runner
 4. `deploying-azure-static-web-apps` → SWA + managed functions code conventions
 5. `applying-azure-cost-guardrails` → audit pre-deploy
+6. `securing-azure-sql-and-storage-with-managed-identity` → when the API is on FC1/ACA, MI auth from day one
 
 **For a specific task** (e.g. "add storage lifecycle"), the relevant sub-skill is invoked directly. No need to load the whole stack.
 
-**For diagnostics**, `diagnosing-azure-deployment-failures` matches symptoms against the 37+ gotcha catalogue. If no match, delegate to Microsoft's `azure-diagnostics` for live log/metric queries.
+**For diagnostics**, `diagnosing-azure-deployment-failures` matches symptoms against the 56-entry gotcha catalogue. If no match, delegate to Microsoft's `azure-diagnostics` for live log/metric queries.
 
 **For learnings**, `curating-azure-deployment-learnings` captures field experience as `learnings/*.md` and promotes recurring patterns into the gotcha catalogue.
 
@@ -83,8 +87,10 @@ This plugin does **not** rebuild what Microsoft already ships. The orchestrator 
 | `azure-rbac` | RBAC verification on deployed resources |
 | `entra-app-registration` | Deeper Entra mechanics |
 | `azure-enterprise-infra-planner` | Enterprise-scale planning |
+| `azure-quotas` | Region / quota availability |
+| `azure-functions-skills` (separate preview pack) | Bare Function App setup, doctor, live health |
 
-This plugin owns: the opinionated low-cost defaults, the gotcha catalogue (37+ entries), the one-git-push workflows, the consumption-first SKU selection, multi-tenant pattern, and the learnings feedback loop.
+This plugin owns: the opinionated low-cost defaults, the gotcha catalogue (56 entries), the one-git-push workflows, the consumption-first SKU selection, the enforced cost guardrails, managed-identity-by-default, the multi-tenant pattern, and the learnings feedback loop.
 
 ---
 
@@ -92,7 +98,7 @@ This plugin owns: the opinionated low-cost defaults, the gotcha catalogue (37+ e
 
 ### Branch strategy
 
-- `main` — all development. Tag `v1.0.0` exists for users pinning to the pre-decomposition plugin.
+- `main` — all development. Tags: `v1.0.0` (pre-decomposition), `v2.1.0`, `v2.2.0`, `v2.3.0`.
 - Do not create `test` / `production` branches here — those are conventions for **derived** projects.
 
 ### Adding / extending a skill
@@ -105,10 +111,11 @@ This plugin owns: the opinionated low-cost defaults, the gotcha catalogue (37+ e
 
 ### Adding a gotcha
 
-1. Capture the field experience first with `curating-azure-deployment-learnings/scripts/capture-learning.sh` — writes a frontmatter-stamped `learnings/YYYY-MM-DD_{project}.md`.
+1. Capture the field experience first with `curating-azure-deployment-learnings/scripts/capture-learning.sh` — writes a frontmatter-stamped `learnings/YYYY-MM-DD_{project}.md` (private, gitignored).
 2. Periodically review with `review-learnings.sh` — flags recurring/high-severity entries.
-3. Promote with `promote-to-gotchas.sh {tag}` — appends a row to `diagnosing-azure-deployment-failures/references/gotchas.md`.
-4. Mark the learning's frontmatter `promoted: true` and update the Status line with the commit SHA.
+3. **Verify against the live estate before promoting** — find a counter-example, not a confirmation (see the curating skill).
+4. Promote with `promote-to-gotchas.sh {tag}` — emits a row skeleton; number it `max + 1` and add it to `diagnosing-azure-deployment-failures/references/gotchas.md` plus the quick symptom table.
+5. Mark the learning's frontmatter `promoted: true` and record the gotcha commit SHA (author's audit trail — the learning itself is never committed).
 
 ### Bumping skill defaults
 
@@ -116,7 +123,9 @@ If a stack version, SKU, or pattern changes:
 1. Update the relevant sub-skill's `templates/` (single source of truth)
 2. Update the sub-skill's SKILL.md / references
 3. Update `orchestrating-azure-deployments/references/stack-versions.md` if it's a global version bump
-4. Same commit. Don't leave docs and templates out of sync.
+4. Re-copy any mirrored template: `scaffolding-azure-bicep-infrastructure/templates/infra/modules/{storageAccount,applicationInsights}.bicep` and `templates/scripts/ci/install-sqlcmd.sh` carry a `CANONICAL SOURCE` header pointing at their owner
+5. Compile every template (`az bicep build --file …`) and run both audit scripts against the scaffold
+6. Same commit. Don't leave docs and templates out of sync.
 
 ---
 
@@ -124,8 +133,9 @@ If a stack version, SKU, or pattern changes:
 
 1. **Simple git push > everything else** — if a change makes deployment harder, reconsider it.
 2. **Free tier > Consumption > fixed cost** — use the cheapest option that meets the need. `applying-azure-cost-guardrails` codifies this.
-3. **Secrets never in code** — SQL password injected at deploy time, never in param files. ACS / API keys via `secretref:`.
+3. **Secrets never in code, and never in the runtime path when a managed identity can do the job** — SQL password injected at deploy time and kept only as rollback once MI is on. ACS / API keys via `secretref:`.
 4. **Idempotent everything** — Bicep, SQL migrations, seed data must be safe to re-run.
 5. **Single-purpose skills** — each skill has one verb, one audience, one trigger surface. Compose, don't bundle.
 6. **Document every gotcha** — if you hit a wall, capture it as a learning, then promote it. The next person should find it in the catalogue.
 7. **Complement, don't reinvent** — Microsoft owns generic Azure; we own opinionated low-cost.
+8. **Prove it in billing, then in behaviour, then in config** — a `minReplicas: 0` screenshot is not evidence; a per-resource daily bill is.

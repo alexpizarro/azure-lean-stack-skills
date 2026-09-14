@@ -137,6 +137,57 @@ Working Azure patterns from real production projects. Every recipe here has a co
 
 ---
 
+## 9. Scale-to-zero warm window — KEDA cron instead of a longer cooldown
+
+**Pattern:** Leave `cooldownPeriod` at 300 s and add a KEDA `cron` scale rule (IANA timezone, `desiredReplicas: 1`) for the hours users actually arrive. KEDA takes `max(rules)`, so HTTP still scales inside the window and the app sleeps at 0 outside it.
+
+**Use for:** any Container App with a predictable busy window (a weekly class night, office hours) where cold starts are user-visible.
+
+**Cost:** ~A$0.02/day for a Tuesday-evening window. The alternative it replaced — `cooldownPeriod: 7200` — was A$1.87/day (A$56/mo) for an app serving 26 requests per 8 hours.
+
+**Files:**
+- Bicep: [`skills/deploying-azure-container-apps/templates/containerApp.bicep`](skills/deploying-azure-container-apps/templates/containerApp.bicep) (`warmWindowStart` / `warmWindowEnd` / `warmWindowTimezone`)
+- `az rest` PATCH body: [`skills/deploying-azure-container-apps/templates/scale-config.json`](skills/deploying-azure-container-apps/templates/scale-config.json)
+- Reference: [`scale-to-zero.md`](skills/deploying-azure-container-apps/references/scale-to-zero.md)
+
+**Proven in:** `BC Quick Check In` (`bcci-app`, 2026-07-30 → measured in billing).
+
+---
+
+## 10. Azure-native cost backstop — budget + stuck-warm alert
+
+**Pattern:** One Bicep module per environment resource group: Action Group → monthly Consumption budget (50/80/100 % actual + 100 % forecast) → a `Replicas` Minimum > 0 for 1 h metric alert on every scale-to-zero Container App. Deployed once, out-of-band, from an owner session (budgets need Cost Management permissions the CI SP doesn't have).
+
+**Use for:** every environment that has a Container App or any resource that can silently go always-on.
+
+**Cost:** ~US$0.10/alert rule/month; budgets are free.
+
+**Files:**
+- Bicep: [`skills/applying-azure-cost-guardrails/templates/costGuardrails.bicep`](skills/applying-azure-cost-guardrails/templates/costGuardrails.bicep)
+- Live sweep: [`skills/applying-azure-cost-guardrails/scripts/check-live-replicas.sh`](skills/applying-azure-cost-guardrails/scripts/check-live-replicas.sh)
+- Skill: [`applying-azure-cost-guardrails`](skills/applying-azure-cost-guardrails/SKILL.md) Guardrails #12–#15
+
+**Proven in:** `bc-videohub-lite` (RG budget + per-resource OpenAI budget + stuck-warm alerts on a GPU app and two CPU twins).
+
+---
+
+## 11. Managed identity for SQL + Blob — secretless runtime, one-flag rollback
+
+**Pattern:** The Function App's system-assigned MI authenticates to Azure SQL (`azure-active-directory-default`) and signs user-delegation SAS for Blob. Both paths are behind env flags that default to the legacy password/key path, so the code ships as a no-op and each resource is cut over (and rolled back) independently.
+
+**Use for:** any FC1 / Container Apps API that talks to SQL or Blob. Not SWA managed functions (no MI there).
+
+**Cost:** $0 — managed identity is free. Removes two rotation liabilities.
+
+**Files:**
+- Skill: [`securing-azure-sql-and-storage-with-managed-identity`](skills/securing-azure-sql-and-storage-with-managed-identity/SKILL.md)
+- Code: [`references/runtime-code-patterns.md`](skills/securing-azure-sql-and-storage-with-managed-identity/references/runtime-code-patterns.md)
+- SQL: [`templates/setup-mi-db-user.sql`](skills/securing-azure-sql-and-storage-with-managed-identity/templates/setup-mi-db-user.sql), [`scripts/create-mi-db-user.cjs`](skills/securing-azure-sql-and-storage-with-managed-identity/scripts/create-mi-db-user.cjs)
+
+**Proven in:** `bc-videohub-lite` (2026-07-17, both flags on in prod; sqladmin kept for migrations and break-glass).
+
+---
+
 ## Recipe template (for adding new ones)
 
 When a real project proves a new pattern, add it here with this shape:

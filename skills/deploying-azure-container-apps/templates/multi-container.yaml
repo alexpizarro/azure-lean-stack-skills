@@ -1,0 +1,47 @@
+# Multi-container Container App (primary + sidecar sharing localhost).
+# Apply atomically with:
+#   az containerapp update --name "$APP_NAME" --resource-group "$RG" --yaml multi-container.yaml
+# See references/sidecar-pattern.md. Proven: trg-directory-content-crawl (FastAPI + crawl4ai sidecar).
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 8000               # ingress goes to the PRIMARY container's port
+      transport: auto
+  template:
+    containers:
+      - name: app                    # primary — ingress points here
+        image: ghcr.io/org/app:0.5.0 # pin by tag (or digest) — never :latest
+        resources:
+          cpu: 0.75
+          memory: 1.5Gi
+        env:
+          - name: SIDECAR_URL
+            value: http://localhost:11235   # talks to the sidecar over localhost
+        probes:
+          - type: liveness
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          - type: readiness
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      - name: browser                # sidecar — internal only, no ingress
+        image: docker.io/unclecode/crawl4ai:0.8.6   # PINNED — :latest drifts and breaks (gotcha #38)
+        resources:
+          cpu: 0.75
+          memory: 1.5Gi
+        env:
+          - name: API_TIMEOUT
+            value: "60"
+    scale:
+      minReplicas: 0
+      maxReplicas: 3
+      cooldownPeriod: 300            # keep at default — see cost-guardrails Guardrail #12b
+      rules:
+        - name: http-scaling
+          http:
+            metadata:
+              concurrentRequests: "5"

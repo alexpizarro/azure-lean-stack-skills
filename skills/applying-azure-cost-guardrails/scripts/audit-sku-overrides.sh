@@ -4,7 +4,8 @@
 #
 # Usage: bash audit-sku-overrides.sh [path]    (default: infra/)
 #
-# Exit code: 0 if only WARN/INFO; non-zero if any FAIL.
+# Exit code: 0 if only INFO; 1 on any FAIL; 3 on WARN-only (so CI can choose to gate on
+#            WARN with `|| [ $? -eq 3 ]` while still failing hard on FAIL).
 
 set -uo pipefail
 
@@ -99,12 +100,31 @@ for f in $loga_files; do
 done
 
 # --- INFO: missing lifecycle rules on storage ---
-storage_files=$(grep -RIl "Microsoft.Storage/storageAccounts'@" "$TARGET" 2>/dev/null)
+# NOTE: match the resource TYPE string 'Microsoft.Storage/storageAccounts@<api>' — an earlier
+# version had a stray quote before the @ and could never fire.
+storage_files=$(grep -RIlE "Microsoft\.Storage/storageAccounts@" "$TARGET" 2>/dev/null)
 for f in $storage_files; do
   if ! grep -q "managementPolicies" "$f"; then
     report "INFO" "$f" "0" "Storage account without lifecycle rules — consider adding for cost ageing"
   fi
 done
+
+# --- WARN: cooldownPeriod > 300 — "the second minReplicas" (Guardrail #12b, gotcha #42) ---
+while IFS=: read -r file line content; do
+  [[ -z "$file" ]] && continue
+  val=$(printf '%s' "$content" | grep -oE '[0-9]+' | tail -1)
+  if [[ -n "$val" && "$val" -gt 300 ]]; then
+    report "WARN" "$file" "$line" "cooldownPeriod: ${val}s (> 300 default). If this exceeds mean inter-arrival time the app never scales to zero — functionally minReplicas: 1 (Guardrail #12b)"
+  fi
+done < <(grep -RInE "cooldownPeriod\s*[:=]\s*[0-9]+" "$TARGET" 2>/dev/null)
+
+# --- INFO: budget / stuck-warm alert — checked independently (Guardrail #15) ---
+if grep -RIqE "Microsoft\.App/containerApps@" "$TARGET" 2>/dev/null; then
+  grep -RIqE "Microsoft\.Consumption/budgets@" "$TARGET" 2>/dev/null \
+    || report "INFO" "$TARGET" "0" "Container Apps present but no Consumption budget declared — see applying-azure-cost-guardrails/templates/costGuardrails.bicep (Guardrail #15)"
+  grep -RIqE "metricName:\s*'Replicas'" "$TARGET" 2>/dev/null \
+    || report "INFO" "$TARGET" "0" "Container Apps present but no Replicas stuck-warm metric alert declared — see costGuardrails.bicep (Guardrail #15)"
+fi
 
 # --- INFO: API Management ---
 if grep -RIqE "Microsoft.ApiManagement/service" "$TARGET" 2>/dev/null; then
@@ -126,6 +146,7 @@ fi
 
 if (( warn_count > 0 )); then
   echo "WARN findings — verify intent before merging."
+  exit 3
 fi
 
 exit 0

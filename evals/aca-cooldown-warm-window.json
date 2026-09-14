@@ -1,0 +1,21 @@
+{
+  "skill": "applying-azure-cost-guardrails",
+  "query": "Our Container App cold-starts every time the door staff scan a ticket on Tuesday evenings. Can you raise the cooldown to a couple of hours so it stays warm?",
+  "context": "Azure Lean Stack project. Container App bcci-app on Consumption, minReplicas: 0, cooldownPeriod: 300, one HTTP scale rule. Traffic is ~80 requests/day, concentrated Tuesday 18:00–23:00 Australia/Sydney, otherwise one request every ~18 minutes.",
+  "expected_behavior": [
+    "Claude WARNS that a cooldownPeriod longer than the gap between requests (18 min) means the alive window never closes and the app is always-on — functionally minReplicas: 1 but invisible (Guardrail #12b, gotcha #42)",
+    "Claude cites the proven cost: cooldownPeriod: 7200 on bcci-app cost ~A$1.87/day (~A$56/mo) to serve 26 requests per 8 hours",
+    "Claude proposes a KEDA cron scale rule pinned to the Tuesday window (timezone Australia/Sydney, start 45 17 * * 2, end 30 23 * * 2, desiredReplicas 1) and leaves cooldownPeriod at 300",
+    "Claude explains KEDA takes max(rules) so HTTP scaling still works inside the window",
+    "Claude applies it via az rest PATCH with the COMPLETE rules array (or the containerApp.bicep warmWindow params), notes activeRevisionsMode must be Single, and reads the scale config back because PATCH returns an empty body",
+    "Claude tells the user to prove the change in daily billing per ResourceId, not by looking at config (Guardrail #14)",
+    "Claude does NOT set cooldownPeriod to 7200 and does NOT set minReplicas: 1 without saying it is a deliberate always-on cost"
+  ],
+  "ground_truth": {
+    "must_invoke": ["applying-azure-cost-guardrails", "deploying-azure-container-apps"],
+    "must_mention": ["cooldownPeriod", "cron", "Australia/Sydney", "max(", "rules array", "Guardrail #12"],
+    "must_avoid_commands": ["--cooldown-period 7200", "cooldownPeriod: 7200", "--min-replicas 1"],
+    "must_run_commands": ["az rest --method PATCH", "az containerapp show"],
+    "must_warn_before_implementing": true
+  }
+}

@@ -7,6 +7,10 @@
 | `WEBSITE_ENABLE_SYNC_UPDATE_SITE` | Y1-only | Don't set |
 | `AzureWebJobsStorage` (single underscore) | Single-underscore = connection-string auth; FC1 prefers MI | `AzureWebJobsStorage__accountName` (double underscore, MI auth) |
 
+## `AzureWebJobsStorage__accountName` needs RBAC before first start
+
+Double-underscore = identity-based host storage. The Function App's system-assigned MI must hold **Storage Blob Data Owner** on the host storage account *before* the app first starts, or the host loops on lease errors. Assigning roles needs Owner / User Access Administrator — a Contributor-only deploy SP cannot do it (gotcha #4). Propagation can take 3–10 minutes; retry before debugging.
+
 ## Required app settings on FC1
 
 ```

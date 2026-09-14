@@ -3,7 +3,9 @@
 #              image runs on Apple Silicon via Docker Desktop Rosetta emulation
 #              (enable Settings -> General -> "Use Rosetta for x86/amd64 emulation").
 #              azure-sql-edge was retired 2025-09 and dropped arm64, so mssql/server
-#              is the supported, high-fidelity choice.
+#              is the supported, high-fidelity choice. Stay on 2022-latest: the
+#              2025-latest RTM image needs AVX and crashes under Docker Desktop's
+#              x86 emulation on Apple Silicon (fixed in 2025 CU1+) — gotcha #56.
 #   - azurite: local Azure Blob emulator -> blobs served fully offline.
 #
 # Bring everything up (compose + migrations + CORS) with: bash scripts/up.sh
@@ -31,7 +33,7 @@ services:
       start_period: 30s
 
   azurite:
-    image: mcr.microsoft.com/azure-storage/azurite
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0   # pinned — never :latest (gotcha #38)
     container_name: "{project}-azurite"
     command: "azurite-blob --blobHost 0.0.0.0 --location /data --skipApiVersionCheck"
     ports:

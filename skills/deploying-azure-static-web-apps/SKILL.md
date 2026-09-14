@@ -7,30 +7,34 @@ description: Deploys React + Azure Functions apps to Azure Static Web Apps with 
 
 The default deployment target for React + Functions web apps. Free tier, global CDN, managed Functions baked in, zero ongoing cost when idle.
 
-## When to use SWA vs FC1 vs Container Apps
+## When to use SWA vs FC1 vs Container Apps vs App Service
 
 | Need | Use |
 |------|-----|
-| CRUD REST API, React frontend, HTTP-only, < 30s requests | **SWA managed functions** (this skill) |
-| Timer triggers, queue triggers, AI workloads, > 30s execution | [FC1 Flex Consumption](../deploying-fc1-flex-consumption-functions/SKILL.md) |
-| Long-running server, WebSocket/SSE, custom Docker runtime | [Container Apps](../deploying-azure-container-apps/SKILL.md) |
+| CRUD REST API, React frontend, HTTP-only, < 30s requests, build output < 250 MB per environment (500 MB total on Free) | **SWA managed functions** (this skill) |
+| Timer triggers, queue triggers, AI workloads, > 30s execution, managed identity / Key Vault refs | [FC1 Flex Consumption](../deploying-fc1-flex-consumption-functions/SKILL.md) |
+| Long-running server, WebSocket/SSE, custom Docker runtime, Next.js with middleware | [Container Apps](../deploying-azure-container-apps/SKILL.md) |
+| Next.js ISR / SSR that outgrew SWA's **app-size ceiling** (250 MB/env Free, 500 MB/env Standard), always-on with no cold start | App Service **B1** (~US$13/mo/env; share the plan with a Function App). Proven: `trg-directory-website`. Not a pack skill yet — a deliberate fixed-cost trade, documented in cost-guardrails "Known floors". |
+
+SWA's Next.js hybrid (SSR) support is preview and breaks with middleware on Next ≥13.4; `BC-Quick Check In` (Next 16 + middleware) moved to Container Apps for that reason.
 
 ## Project structure
 
 ```
-frontend/                        — React 19 + Vite 6 + TypeScript
+frontend/                        — React 19 + Vite 8 + TypeScript
 ├── src/
 │   ├── App.tsx
 │   └── services/api.ts
 ├── public/
 │   └── staticwebapp.config.json — routing + security headers
-├── vite.config.ts               — proxy /api/* → localhost:7071
-└── package.json
+├── vite.config.ts               — proxy /api/* → localhost:7071 (or the test SWA via `npm run dev:test`)
+└── package.json                 — scripts: dev, dev:test, typecheck, build
 
 api/                              — Managed Azure Functions v4 (Node 22)
 ├── src/
 │   ├── index.ts                 — Entry point — IMPORT EVERY FUNCTION FILE HERE
 │   ├── functions/
+│   │   ├── health.ts            — shallow /api/health (DB-free); ?deep=1 probes SQL
 │   │   ├── hello.ts             — app.http(...) at the bottom registers the route
 │   │   ├── getItems.ts
 │   │   └── createItem.ts
@@ -38,11 +42,11 @@ api/                              — Managed Azure Functions v4 (Node 22)
 │       └── database.ts          — mssql pool, module-level singleton
 ├── host.json
 ├── tsconfig.json                — "module": "commonjs" required for SWA
-├── package.json                 — "main": "dist/index.js" (specific path, not glob)
+├── package.json                 — "main": "dist/index.js", "engines": {"node":"22"}, "typecheck" script
 └── local.settings.json.example  — empty strings + __HINT_* keys
 ```
 
-## The two SWA gotchas you WILL hit
+## The four SWA gotchas you WILL hit
 
 ### 1. New function returns 404 — forgot to import in `index.ts`
 
@@ -71,14 +75,26 @@ SWA managed functions require:
 // (do NOT add "type": "module")
 ```
 
-This differs from standalone FC1 which uses ESM. If you migrate api/ to FC1 later, you must flip both settings.
+Standalone FC1 apps use the **same** CommonJS shape (proven in `bc-videohub-lite`), so `api/` moves to FC1 unchanged.
+
+### 3. Managed functions can't use managed identity or Key Vault references
+
+SWA managed functions support **HTTP triggers only**, and neither managed identity nor `@Microsoft.KeyVault(...)` app-setting references. Secrets (the SQL connection string) live as plain SWA app settings. If a security review requires secretless auth, move `api/` to [FC1](../deploying-fc1-flex-consumption-functions/SKILL.md) and follow [securing-azure-sql-and-storage-with-managed-identity](../securing-azure-sql-and-storage-with-managed-identity/SKILL.md). Linking that Function App as a "bring your own" backend needs the **Standard** SWA plan (US$9/mo); on Free, the browser calls the Function App directly with CORS.
+
+### 4. The SWA edge overwrites the `Authorization` header
+
+Requests through `/api/*` arrive at your function with `Authorization` **replaced by the platform's own token** (proven with a header-echo function in `count8-website`). API keys and bearer tokens must travel in a custom header (e.g. `x-api-key`). If a caller is cut over to SWA, switch its header *before* DNS moves.
+
+## Node version
+
+`platform.apiRuntime` in `staticwebapp.config.json` pins the managed-functions runtime. `node:22` is the newest supported value (Node 20 support in Azure Functions ended 2026-04-30; `node:24` is not yet accepted for managed functions). Match it with `"engines": { "node": "22" }` in `api/package.json` and an `.nvmrc` of `22` so Oryx, CI and local dev agree.
 
 ## Function file template
 
 ```typescript
 // api/src/functions/getItems.ts
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { getPool } from '../lib/database';
+import { query } from '../lib/database';
 
 export async function getItems(req: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> {
   // Mock when DB not configured (local dev convenience)
@@ -87,9 +103,8 @@ export async function getItems(req: HttpRequest, ctx: InvocationContext): Promis
     return { status: 200, jsonBody: { items: [{ id: 1, name: '[MOCK] Item' }] } };
   }
 
-  const pool = await getPool();
-  const result = await pool.request().query('SELECT * FROM dbo.Items');
-  return { status: 200, jsonBody: { items: result.recordset } };
+  const items = await query<{ Id: number; Name: string }>('SELECT Id, Name FROM dbo.Items');
+  return { status: 200, jsonBody: { items } };
 }
 
 // Route registration — runs when this module is imported by index.ts
@@ -159,21 +174,25 @@ export async function health(req: HttpRequest): Promise<HttpResponseInit> {
 app.http('health', { methods: ['GET'], authLevel: 'anonymous', route: 'health', handler: health });
 ```
 
-Point uptime monitors and schedulers at `/api/health` (shallow); reserve `/api/health?deep=1` for on-demand diagnostics. Proven: `trg-directory-website`'s `status.ts` queried the DB on every call and a 5-min scheduler hit it, defeating auto-pause.
+Point uptime monitors and schedulers at `/api/health` (shallow); reserve `/api/health?deep=1` for on-demand diagnostics. The template ships this as `api/src/functions/health.ts`. Proven: `trg-directory-website`'s `status.ts` queried the DB on every call and a 5-min scheduler hit it, defeating auto-pause.
 
 ## `staticwebapp.config.json`
 
 ```json
 {
-  "navigationFallback": { "rewrite": "/index.html", "exclude": ["/api/*", "/assets/*", "*.{css,js,png,svg}"] },
+  "platform": { "apiRuntime": "node:22" },
+  "navigationFallback": { "rewrite": "/index.html", "exclude": ["/api/*", "/assets/*", "*.{css,js,png,svg,jpg,jpeg,ico,woff2}"] },
   "globalHeaders": {
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
     "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(), microphone=(), camera=()"
   }
 }
 ```
+
+Don't add a catch-all `"route": "/*"` rewrite — `navigationFallback` already does that, and the legacy catch-all is only for migrating from the deprecated `routes.json`.
 
 See [references/swa-config.md](references/swa-config.md) for the full routing + auth pattern.
 

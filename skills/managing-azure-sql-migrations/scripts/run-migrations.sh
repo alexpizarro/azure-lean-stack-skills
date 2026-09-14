@@ -60,11 +60,13 @@ if (( ${#files[@]} == 0 )); then
   exit 0
 fi
 
-for f in $(printf '%s\n' "${files[@]}" | sort); do
+# -b: exit non-zero on a T-SQL error (otherwise a failed migration reports success).
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
   echo "Running migration: $f"
   "$SQLCMD" -S "$SQL_SERVER" -d "$SQL_DB" \
     -U "$SQL_USER" -P "$SQL_PASSWORD" \
-    -i "$f" -C
-done
+    -i "$f" -C -b
+done < <(printf '%s\n' "${files[@]}" | sort)
 
 echo "✓ All migrations completed successfully."

@@ -1,21 +1,25 @@
 {
-  "name": "claude-azure-starter-api",
+  "name": "azure-lean-stack-api",
   "version": "1.0.0",
-  "description": "Azure Functions API — Claude Azure Starter",
+  "description": "Azure Functions API — Azure Lean Stack (SWA managed functions, CommonJS, Node 22)",
   "main": "dist/index.js",
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "watch": "tsc -w",
     "prestart": "npm run build",
     "start": "func start"
   },
   "dependencies": {
-    "@azure/functions": "^4.5.0",
-    "mssql": "^11.0.1"
+    "@azure/functions": "^4.16.2",
+    "mssql": "^12.7.2"
   },
   "devDependencies": {
-    "@types/mssql": "^9.1.5",
-    "@types/node": "^22.0.0",
-    "typescript": "^5.7.3"
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^22.20.0",
+    "typescript": "^5.9.3"
   }
 }

@@ -150,3 +150,6 @@ Per-tenant invoices/chargebacks become trivial.
 | File | Purpose |
 |------|---------|
 | [templates/multi-tenant-main.bicep](templates/multi-tenant-main.bicep) | main.bicep with the tenant param pattern |
+| `templates/modules/*.bicep` | Symlinks to the single-tenant scaffold's modules (`scaffolding-azure-bicep-infrastructure/templates/infra/modules/`) so this root compiles standalone. In a real project, copy the modules directory next to `main.bicep`. |
+
+**Naming note:** the multi-tenant root names the database `{tenant}-db-{env}` while the single-tenant scaffold uses `{org}-{project}-sqldb-{env}`. Keep whichever your first deployment used — renaming a database resource recreates it.

@@ -25,7 +25,7 @@ Most apps have two flavours of blob:
 Apply different lifecycle rules to each:
 
 ```bicep
-resource tempBlobLifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
+resource tempBlobLifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@2024-01-01' = {
   parent: storageAccount
   name: 'default'
   properties: {
@@ -79,7 +79,7 @@ See [references/lifecycle-rules.md](references/lifecycle-rules.md).
 Most containers stay private (`publicAccess: 'None'`) with SAS-based access. One opt-in public-read container for assets that need to be served via plain URLs (branding, public catalog images):
 
 ```bicep
-resource brandingContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+resource brandingContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = {
   parent: blobService
   name: 'branding'
   properties: { publicAccess: 'Blob' }    // read-only public access
@@ -91,14 +91,14 @@ To allow this, the storage account itself must set `allowBlobPublicAccess: true`
 ## Storage account defaults
 
 ```bicep
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   kind: 'StorageV2'
   sku: { name: 'Standard_LRS' }            // LRS = cheapest. Use GRS only when DR matters.
   properties: {
     accessTier: 'Hot'                      // Hot for new blobs (lifecycle ages them later)
     supportsHttpsTrafficOnly: true
     minimumTlsVersion: 'TLS1_2'
-    allowBlobPublicAccess: true            // gated per-container; flip to false if no public container exists
+    allowBlobPublicAccess: createBrandingContainer   // true ONLY when a public-read container exists
   }
 }
 ```
@@ -107,7 +107,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 |---------|---------|---------------|
 | `sku.name` | `Standard_LRS` | `Standard_GRS` for geo-redundant backups (~2× cost) |
 | `accessTier` | `Hot` | Set `Cool` at account level if 95%+ of writes are write-once-read-rarely |
-| `allowBlobPublicAccess` | `true` only if a public container exists | `false` otherwise — defence in depth |
+| `allowBlobPublicAccess` | derived from `createBrandingContainer` in the template (`true` only if a public container exists) | keep `false` otherwise — defence in depth |
 
 See [references/access-tiers.md](references/access-tiers.md).
 
@@ -116,7 +116,7 @@ See [references/access-tiers.md](references/access-tiers.md).
 Browser uploads via SAS and Range reads (e.g. video players with `crossOrigin="anonymous"`) need CORS:
 
 ```bicep
-resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' = {
   parent: storageAccount
   name: 'default'
   properties: {
@@ -149,6 +149,10 @@ See [references/cors-for-spa.md](references/cors-for-spa.md).
 - Customer support tickets that take hours to resolve
 
 Use **Cold** instead (~$0.0036/GB/month). Cold is still online and instantly accessible.
+
+## Data protection (optional, cheap)
+
+For user-generated media worth keeping: blob soft-delete (14 d), container soft-delete (14 d) and `isVersioningEnabled: true` on the blob service, plus a time-based immutability policy on an `originals/` container if you need WORM. All are in `bc-videohub-lite`'s `storage.bicep`; add them to the template's `blobService` when the workload justifies it. Still **never `tierToArchive`**.
 
 ## Storage naming
 

@@ -12,7 +12,7 @@ The original starter unconditionally provisioned SWA + SQL. Projects that didn't
 targetScope = 'subscription'
 
 @allowed(['test', 'prod'])
-param environment string
+param environmentName string
 
 param location string = 'australiaeast'
 
@@ -24,23 +24,22 @@ param project string
 param deploySql bool = true
 param deployStorage bool = false
 param deployObservability bool = false
-param deployContainerApp bool = false
 
 // SQL password only required when SQL is enabled
 @secure()
 param sqlAdminPassword string = ''
 
 var baseName = '${org}-${project}'
-var rgName   = '${baseName}-rg-${environment}'
+var rgName   = '${baseName}-rg-${environmentName}'
 
 module rg 'modules/resourceGroup.bicep' = {
-  name: 'deploy-rg-${environment}'
+  name: 'deploy-rg-${environmentName}'
   params: { name: rgName, location: location }
 }
 
 // SWA is always deployed (the orchestrator's defining component)
 module swa 'modules/staticWebApp.bicep' = {
-  name: 'deploy-swa-${environment}'
+  name: 'deploy-swa-${environmentName}'
   scope: resourceGroup(rgName)
   params: { ... }
   dependsOn: [rg]
@@ -48,21 +47,21 @@ module swa 'modules/staticWebApp.bicep' = {
 
 // Everything else is conditional
 module sql 'modules/sqlServer.bicep' = if (deploySql) {
-  name: 'deploy-sql-${environment}'
+  name: 'deploy-sql-${environmentName}'
   scope: resourceGroup(rgName)
   params: { ... }
   dependsOn: [rg]
 }
 
 module storage 'modules/storageAccount.bicep' = if (deployStorage) {
-  name: 'deploy-storage-${environment}'
+  name: 'deploy-storage-${environmentName}'
   scope: resourceGroup(rgName)
   params: { ... }
   dependsOn: [rg]
 }
 
 module observability 'modules/applicationInsights.bicep' = if (deployObservability) {
-  name: 'deploy-ai-${environment}'
+  name: 'deploy-ai-${environmentName}'
   scope: resourceGroup(rgName)
   params: { ... }
   dependsOn: [rg]
@@ -88,7 +87,7 @@ Test environment with SQL only:
 ```json
 {
   "parameters": {
-    "environment": { "value": "test" },
+    "environmentName": { "value": "test" },
     "org":         { "value": "acme" },
     "project":     { "value": "taskapp" },
     "deploySql":         { "value": true  },
@@ -103,7 +102,7 @@ Prod environment with full stack:
 ```json
 {
   "parameters": {
-    "environment": { "value": "prod" },
+    "environmentName": { "value": "prod" },
     "org":         { "value": "acme" },
     "project":     { "value": "taskapp" },
     "deploySql":         { "value": true },

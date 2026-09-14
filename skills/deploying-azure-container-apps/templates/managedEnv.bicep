@@ -12,7 +12,7 @@ param dailyCapGb int = 1
 @description('Log retention in days. Workspace minimum 30, maximum 730.')
 param retentionInDays int = 30
 
-resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+resource workspace 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   name: '${name}-logs'
   location: location
   tags: tags
@@ -26,7 +26,7 @@ resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   }
 }
 
-resource managedEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
+resource managedEnv 'Microsoft.App/managedEnvironments@2025-01-01' = {
   name: name
   location: location
   tags: tags

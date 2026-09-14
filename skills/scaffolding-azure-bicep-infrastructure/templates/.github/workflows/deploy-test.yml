@@ -9,6 +9,12 @@ permissions:
   id-token: write   # Required for OIDC login to Azure
   contents: read
 
+# A newer push supersedes an in-flight run on TEST (cancel it — saves paid Actions minutes).
+# On PROD never cancel: a half-applied prod deploy is worse than a queued one.
+concurrency:
+  group: deploy-test
+  cancel-in-progress: true
+
 jobs:
   deploy:
     name: Deploy Test Environment
@@ -16,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Required for git diff to work across multi-commit pushes
 
@@ -44,7 +50,7 @@ jobs:
       # 2. Login to Azure via OIDC (no client secret — no rotation needed)
       # -----------------------------------------------------------------------
       - name: Azure Login
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID_TEST }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -63,7 +69,7 @@ jobs:
         run: |
           result=$(az deployment sub create \
             --name "deploy-test-${{ github.run_id }}" \
-            --location australiaeast \
+            --location "$(jq -r '.parameters.location.value // "australiaeast"' infra/environments/test.parameters.json)" \
             --template-file infra/main.bicep \
             --parameters @infra/environments/test.parameters.json \
             --parameters sqlAdminPassword="$SQL_PASSWORD" \
@@ -73,6 +79,7 @@ jobs:
           SWA_TOKEN=$(echo "$result" | jq -r '.swaDeploymentToken.value')
           SQL_FQDN=$(echo "$result"  | jq -r '.sqlServerFqdn.value')
           SQL_DB=$(echo "$result"    | jq -r '.sqlDbName.value')
+          SWA_NAME=$(echo "$result"  | jq -r '.swaName.value')
 
           RG_NAME=$(echo "$result" | jq -r '.resourceGroupName.value')
 
@@ -82,7 +89,15 @@ jobs:
           echo "swaToken=$SWA_TOKEN"             >> "$GITHUB_OUTPUT"
           echo "sqlFqdn=$SQL_FQDN"               >> "$GITHUB_OUTPUT"
           echo "sqlDb=$SQL_DB"                   >> "$GITHUB_OUTPUT"
+          echo "swaName=$SWA_NAME"               >> "$GITHUB_OUTPUT"
           echo "resourceGroupName=$RG_NAME"      >> "$GITHUB_OUTPUT"
+
+          # Optional module outputs (empty string when the toggle is off)
+          AI_CONN=$(echo "$result" | jq -r '.appInsightsConnectionString.value // empty')
+          if [ -n "$AI_CONN" ]; then
+            echo "::add-mask::$AI_CONN"
+            echo "appInsightsConnectionString=$AI_CONN" >> "$GITHUB_OUTPUT"
+          fi
 
       # -----------------------------------------------------------------------
       # 4. Run SQL migrations
@@ -93,7 +108,8 @@ jobs:
       #    Skipped when no infra/ files changed.
       # -----------------------------------------------------------------------
       - name: Run SQL Migrations
-        if: steps.changes.outputs.infra_changed == 'true'
+        # Only when infra ran AND the SQL module was deployed (deploySql may be false).
+        if: steps.changes.outputs.infra_changed == 'true' && steps.infra.outputs.sqlFqdn != ''
         env:
           SQL_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD_TEST }}
         run: |
@@ -102,26 +118,18 @@ jobs:
           SQL_SERVER_NAME="${SQL_SERVER/.database.windows.net/}"
           RG="${{ steps.infra.outputs.resourceGroupName }}"
           RULE_NAME="github-runner-${{ github.run_id }}"
+          SQL_USER=$(jq -r '.parameters.sqlAdminLogin.value // "sqladmin"' infra/environments/test.parameters.json)
 
           # Guarantee firewall rule removal on exit, even if the step fails
           trap 'echo "Cleaning up firewall rule..."; az sql server firewall-rule delete \
             --resource-group "$RG" --server "$SQL_SERVER_NAME" \
             --name "$RULE_NAME" --yes 2>/dev/null || true' EXIT
 
-          # Install sqlcmd — not pre-installed on ubuntu-24.04 (ubuntu-latest)
-          # --batch --yes required: gpg cannot open /dev/tty in headless CI
-          # Pipe through sudo tee (not sudo gpg -o) to avoid permission issues
-          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
-            | gpg --batch --yes --dearmor \
-            | sudo tee /usr/share/keyrings/microsoft-prod.gpg > /dev/null
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] \
-            https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod \
-            $(lsb_release -cs) main" \
-            | sudo tee /etc/apt/sources.list.d/mssql-release.list > /dev/null
-          sudo apt-get update -q
-          sudo ACCEPT_EULA=Y apt-get install -y -q mssql-tools18 unixodbc-dev
+          # Install sqlcmd — not pre-installed on GitHub's ubuntu-latest (24.04) runners.
+          # scripts/ci/install-sqlcmd.sh is the single source of truth (copied from the
+          # managing-azure-sql-migrations skill): gpg --batch --yes + sudo tee + mssql-tools18.
+          bash scripts/ci/install-sqlcmd.sh
           SQLCMD=/opt/mssql-tools18/bin/sqlcmd
-          "$SQLCMD" -? > /dev/null 2>&1 || { echo "ERROR: sqlcmd install failed"; exit 1; }
 
           # Add runner IP to SQL firewall temporarily
           RUNNER_IP=$(curl -s https://api.ipify.org)
@@ -131,12 +139,17 @@ jobs:
             --name "$RULE_NAME" \
             --start-ip-address "$RUNNER_IP" --end-ip-address "$RUNNER_IP"
 
-          # Run all migration files in alphabetical order
-          for f in $(ls infra/sql/migrations/*.sql | sort); do
+          # Run all migration files in alphabetical order (nullglob + sorted read loop —
+          # no `ls` parsing, whitespace-safe). `-b` makes sqlcmd exit non-zero on a T-SQL
+          # error; without it a failed migration reports success.
+          shopt -s nullglob
+          files=(infra/sql/migrations/*.sql)
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
             echo "Running migration: $f"
             "$SQLCMD" -S "$SQL_SERVER" -d "$SQL_DB" \
-              -U sqladmin -P "$SQL_PASSWORD" -i "$f" -C
-          done
+              -U "$SQL_USER" -P "$SQL_PASSWORD" -i "$f" -C -b
+          done < <(printf '%s\n' "${files[@]}" | sort)
           echo "All migrations completed successfully."
 
       # -----------------------------------------------------------------------
@@ -175,3 +188,17 @@ jobs:
           app_location: frontend
           output_location: dist
           api_location: api
+
+      # -----------------------------------------------------------------------
+      # 7. Wire App Insights into the SWA managed functions (observability toggle on).
+      #    SWA app settings survive code-only deploys, so this only needs to run
+      #    when Bicep ran and produced a connection string.
+      # -----------------------------------------------------------------------
+      - name: Set APPLICATIONINSIGHTS_CONNECTION_STRING on SWA
+        if: steps.changes.outputs.infra_changed == 'true' && steps.infra.outputs.appInsightsConnectionString != ''
+        run: |
+          az staticwebapp appsettings set \
+            --name "${{ steps.infra.outputs.swaName }}" \
+            --resource-group "${{ steps.infra.outputs.resourceGroupName }}" \
+            --setting-names APPLICATIONINSIGHTS_CONNECTION_STRING="${{ steps.infra.outputs.appInsightsConnectionString }}" \
+            --output none

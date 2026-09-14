@@ -69,7 +69,8 @@ See [templates/000_migration_history.sql](templates/000_migration_history.sql) a
 1. **File naming:** `{NNN}_{description}.sql` — zero-padded, snake_case.
 2. **Never edit an applied migration** — add a new one instead.
 3. **Seed data must be idempotent** — `IF NOT EXISTS` or `MERGE`.
-4. **No rollback scripts** — roll forward only. Point-in-time restore is available (7-day retention on serverless).
+4. **No rollback scripts** — roll forward only. Point-in-time restore is available (7-day retention on Serverless and Basic).
+6. **Set an explicit `requestTimeout` (≥ 120 s) on any Node/`mssql` script that runs DDL** — the library default is 15 s and a long `ALTER TABLE` on a paused serverless DB will time out on resume.
 5. **`000` always runs first** — creates the tracking table.
 
 ## Why not `azure/sql-action`
@@ -78,14 +79,15 @@ The GitHub action `azure/sql-action@v2.3` accepts **only one file**. Multi-file 
 
 ## The workflow step
 
-The deploy workflows call [scripts/install-sqlcmd.sh](scripts/install-sqlcmd.sh) and [scripts/run-migrations.sh](scripts/run-migrations.sh). Both encode hard-won fixes:
+The scaffolded deploy workflows call `scripts/ci/install-sqlcmd.sh` (a copy of [scripts/install-sqlcmd.sh](scripts/install-sqlcmd.sh) placed in the project so the workflow has no dependency on the plugin) and inline the migration loop; [scripts/run-migrations.sh](scripts/run-migrations.sh) is the same loop as a standalone script for non-scaffolded projects. Both encode hard-won fixes:
 
 | Fix | Why |
 |-----|-----|
 | `gpg --batch --yes --dearmor` | Without `--batch`, gpg tries to open `/dev/tty` and fails in headless CI |
 | Pipe through `sudo tee` | Don't use `sudo gpg -o /path` — permission issues |
-| Install `mssql-tools18` explicitly | Not pre-installed on ubuntu-24.04 (which `ubuntu-latest` now points to) |
+| Install `mssql-tools18` explicitly | Not pre-installed on GitHub's `ubuntu-latest` (24.04 today); the apt line is derived from `lsb_release`, so the same script works on 26.04 |
 | `sqlcmd -C` flag | Required with mssql-tools18 to trust Azure SQL TLS certificate |
+| `sqlcmd -b` flag | Exit non-zero on a T-SQL error — without it a failed migration reports success and the deploy goes green |
 | `trap ... EXIT` for firewall cleanup | Guarantees the runner's temporary firewall rule is removed even if a migration fails |
 
 ## Local development

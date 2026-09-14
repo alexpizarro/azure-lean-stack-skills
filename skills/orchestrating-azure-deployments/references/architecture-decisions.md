@@ -56,7 +56,7 @@ All three use exactly this pattern with `deploy-test.yml` + `deploy-prod.yml` wo
 
 **When to break this:** timer triggers, queue triggers, AI workloads, anything that needs >30s execution. See [`deploying-fc1-flex-consumption-functions`](../../deploying-fc1-flex-consumption-functions/SKILL.md).
 
-## 2. SQL Serverless
+## 2. SQL Serverless by default, Basic when the DB is small and polled
 
 `GP_S_Gen5_1` SKU, auto-pauses after 15 minutes idle, 0.5 vCores minimum, 1 GB max size, locally-redundant backup.
 
@@ -64,13 +64,15 @@ All three use exactly this pattern with `deploy-test.yml` + `deploy-prod.yml` wo
 - Cost when paused: storage only (~$0.10/GB/month for the 1GB cap)
 - Cost when active: ~$0.52/vCore-hour
 
-**When to break this:** sustained traffic where pause latency hurts UX. Switch to GP/Provisioned with a fixed vCore count.
+**When to break this:** a small (metadata-scale) DB that is hit on a steady cadence never pauses and costs *more* than flat **Basic** (~$5/mo, 2 GB, no cold start). Both proven projects with steady traffic (`bc-videohub-lite`, `trg-directory-website`) run Basic in production. The scaffold exposes `sqlSku: 'Serverless' | 'Basic'`; pick per environment in the parameter file. Only go to provisioned GP vCores for genuinely sustained query load.
 
 ## 3. OIDC auth (no client secrets)
 
-Two service principals per project for `test` and `production` branches; one more for each new environment-branch. Each SP has a federated credential bound to its branch's `refs/heads/{branch}` subject. No secrets to rotate.
+Two service principals per project for `test` and `production` branches; one more for each new environment-branch. Each SP has a federated credential bound to its branch's `refs/heads/{branch}` subject. No secrets to rotate. `azure/login@v3`.
 
-The federated credential subject MUST match `repo:{org}/{repo}:ref:refs/heads/{branch}` exactly — any drift causes `AADSTS70021`.
+The federated credential subject MUST match `repo:{org}/{repo}:ref:refs/heads/{branch}` exactly — any drift causes `AADSTS70021`. That includes manual dispatch: `gh workflow run … --ref test`.
+
+CI SPs are **Contributor-only**. Anything that needs `roleAssignments/write` (managed-identity RBAC, budgets, custom roles) is applied out-of-band once from an owner session and kept in source behind a default-off flag.
 
 ## 4. JSON parameter files (`.parameters.json` not `.bicepparam`)
 
@@ -116,12 +118,18 @@ Single source of truth: `infra/environments/{env}.parameters.json`. Set `org` an
 - ACS connection strings, AI keys, etc: retrieved at deploy or set via `az containerapp secret set`
 - `local.settings.json.example` uses `""` for all user-input values + `__HINT_*` keys (real placeholders are truthy and break `if (!value)` checks)
 
-## 9. Every pattern in this pack is proven
+## 9. No third-party marketplace action in the deploy path when `az` can do the job
+
+`Azure/functions-action` was disabled on GitHub for five days in June 2026 and every dependent pipeline went red. Deploy Function Apps with `az functionapp deployment source config-zip`; keep `Azure/static-web-apps-deploy@v1` (Docker-based, the only supported SWA build path) and the first-party `actions/*` + `azure/login`. Never add a third-party action to a workflow that holds credentials for change detection either — plain `git diff` does the job.
+
+## 10. Every pattern in this pack is proven
 
 If no shipping project uses a pattern, it doesn't get added. The current proven patterns trace to:
 
-- `bc-videohub-lite` — multi-tenant Bicep, Storage lifecycle, ACA Jobs, shared managed env
-- `trg-directory-website` — modular toggles, workspace-based App Insights, Container Apps Job for SWA deploys, Logic Apps Consumption scheduler
-- `trg-directory-content-crawl` — multi-container ACA with sidecar + probes, Azure OpenAI via Cognitive Services, GHA OIDC for ACA deploys
+- `bc-videohub-lite` — multi-tenant Bicep, Storage lifecycle, ACA Jobs, shared managed env, FC1 (CommonJS) API, managed-identity SQL + Blob, Consumption budgets + stuck-warm alerts, az-CLI zip deploy, `always()` settings restore, SQL Basic
+- `trg-directory-website` — modular toggles, workspace-based App Insights, Container Apps Job for SWA deploys, Logic Apps Consumption scheduler, App Service B1 for Next.js ISR, cost sentinel, deploy-freshness gate, direct-ARM job start from an MI
+- `trg-directory-content-crawl` — multi-container ACA with sidecar + probes, Azure OpenAI via Cognitive Services, GHA OIDC for ACA deploys, HTTP app → Job retirement, structural workflow tests, shared cross-subscription ACR
+- `BC Quick Check In` (`bcci-app`) — Next.js 16 on Container Apps, KEDA cron warm window replacing a 7200s cooldown, blob-as-database
+- `count8-website` — SWA Free + plain-JS managed functions, the `Authorization`-header overwrite, apex-alias DNS cutover
 
 If you're tempted to add something that isn't yet in a shipping project, capture it as a *learning* via [`curating-azure-deployment-learnings`](../../curating-azure-deployment-learnings/SKILL.md) and promote it once a real project uses it.

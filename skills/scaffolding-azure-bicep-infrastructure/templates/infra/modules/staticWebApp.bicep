@@ -9,7 +9,7 @@ param skuName string = 'Free'
 @description('SQL connection string passed in by main.bicep. Empty string is acceptable — the app setting just won\'t be set.')
 param sqlConnectionString string = ''
 
-resource swa 'Microsoft.Web/staticSites@2023-01-01' = {
+resource swa 'Microsoft.Web/staticSites@2024-04-01' = {
   name: name
   location: location
   tags: tags
@@ -28,7 +28,7 @@ resource swa 'Microsoft.Web/staticSites@2023-01-01' = {
 
 // App settings are available as environment variables in managed functions.
 // SQL_CONNECTION_STRING is only set when sqlConnectionString is non-empty.
-resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-01-01' = if (!empty(sqlConnectionString)) {
+resource swaAppSettings 'Microsoft.Web/staticSites/config@2024-04-01' = if (!empty(sqlConnectionString)) {
   parent: swa
   name: 'appsettings'
   properties: {

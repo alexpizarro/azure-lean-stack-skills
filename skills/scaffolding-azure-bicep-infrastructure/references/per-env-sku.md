@@ -21,7 +21,7 @@ Inside the module:
 ```bicep
 param skuName string = 'Free'
 
-resource swa 'Microsoft.Web/staticSites@2023-01-01' = {
+resource swa 'Microsoft.Web/staticSites@2024-04-01' = {
   ...
   sku: {
     name: skuName
@@ -35,11 +35,11 @@ resource swa 'Microsoft.Web/staticSites@2023-01-01' = {
 | Service | Test SKU | Prod SKU | Notes |
 |---------|----------|----------|-------|
 | Static Web App | `Free` | `Standard` | Standard adds custom domains, SLA, larger function quota |
-| SQL Database | `GP_S_Gen5_1` (Serverless) | `GP_S_Gen5_1` (Serverless) | Same — auto-pause handles cost in both |
+| SQL Database | `GP_S_Gen5_1` (Serverless) | `GP_S_Gen5_1` (Serverless) **or** `Basic` via `sqlSku` | Serverless for bursty traffic; Basic (~$5/mo flat) when the DB is small and polled steadily — cost-guardrails Guardrail #11 |
 | Storage Account | `Standard_LRS` | `Standard_LRS` or `Standard_GRS` | LRS for non-critical; GRS for backups |
 | Log Analytics | `PerGB2018` + `dailyQuotaGb: 1` | `PerGB2018` + `dailyQuotaGb: 5` | Daily cap is the actual cost control |
 | Container App (min replicas) | `0` | `0` (or `1` if cold start matters) | Scale-to-zero is the default cost win |
-| Function App | `Y1` (Consumption) or `FC1` | same | No fixed-cost plan |
+| Function App | `FC1` (Flex Consumption), `alwaysReady: []` | same | Y1 Linux Consumption is retiring 2028-09; no fixed-cost plan |
 
 ## Per-env CORS / hostnames
 

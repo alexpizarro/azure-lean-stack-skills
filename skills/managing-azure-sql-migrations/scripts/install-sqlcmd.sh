@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Installs sqlcmd (mssql-tools18) on ubuntu-24.04 GitHub runners.
-# Not pre-installed since ubuntu-latest moved to 24.04.
+# Installs sqlcmd (mssql-tools18) on GitHub-hosted Ubuntu runners.
+# Not pre-installed on ubuntu-latest (24.04 today; the apt repo line is derived from
+# lsb_release so the same script works when ubuntu-latest moves to 26.04).
 #
 # Embeds known fixes:
 #   - --batch --yes on gpg: avoids "cannot open /dev/tty" in headless CI

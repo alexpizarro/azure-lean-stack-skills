@@ -96,6 +96,10 @@ az role assignment create \
 
 `Contributor` cannot grant roles to other principals. `User Access Administrator` can.
 
+## Dispatching manually
+
+`gh workflow run <file> --ref <branch>` — without `--ref` the run inherits the default branch (`main`), whose ref has no federated credential, and login fails with `AADSTS70021`.
+
 ## Cleaning up
 
 Delete a federated credential:

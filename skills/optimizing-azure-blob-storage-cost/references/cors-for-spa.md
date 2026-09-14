@@ -8,7 +8,7 @@ Two browser scenarios need CORS on the blob service:
 ## CORS rule template
 
 ```bicep
-resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' = {
   parent: storageAccount
   name: 'default'
   properties: {

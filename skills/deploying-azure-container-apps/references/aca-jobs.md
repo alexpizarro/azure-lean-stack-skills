@@ -84,6 +84,17 @@ configuration: {
 }
 ```
 
+## Traps when driving Jobs from code or CLI
+
+| Trap | Reality |
+|---|---|
+| `az containerapp job update --replica-retry-limit 0` | Silently ignores the `0` (treated as falsy) and leaves it at 1 — reports success. Use `az rest --method PATCH` and read the value back. |
+| `POST .../jobs/{name}/start` with `{ "env": [...] }` | The body **replaces the whole container env**, dropping every secretRef-backed var. GET the job, clone `template.containers[0]`, append, then POST. |
+| Wrapping the start body in `{ "template": {...} }` | Silently accepted as an *empty* override — the job runs with stock env and exits non-zero. The body is a top-level `JobExecutionTemplate`: `{ "containers": [...], "initContainers": [...] }`. |
+| Polling for `Failed` at exactly `replicaTimeout` | Terminal status lands ~2–3 min after the cap fires (propagation + 60s poll granularity). |
+| Verifying a deploy by `curl`ing an HTTP app's `/health` | A paid wake-up. Assert the Job's image tag instead: `az containerapp job show --query "properties.template.containers[0].image"`. |
+| Starting the job from an app's managed identity | Built-in "Container Apps Contributor" has no `Microsoft.App/jobs/*` actions. Create a custom role with `jobs/read` + `jobs/start/action` (+ `jobs/executions/read`) scoped to the job. |
+
 ## Secrets and private images
 
 Jobs use the same `secrets:` + `secretref:` pattern as Container Apps:

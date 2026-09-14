@@ -1,6 +1,6 @@
 # Composition with Microsoft's azure-skills
 
-This skill is **complementary** to [microsoft/azure-skills](https://github.com/microsoft/azure-skills). That plugin ships 25 curated Azure skills + the Azure MCP Server (200+ structured tools) + the Foundry MCP. Install both for the full experience.
+This skill is **complementary** to [microsoft/azure-skills](https://github.com/microsoft/azure-skills). That plugin ships ~27 curated Azure skills + the Azure MCP Server (200+ structured tools across 40+ services) + the Foundry MCP; install it in Claude Code with `/plugin install azure@claude-plugins-official`. Microsoft also publishes a separate, Functions-only pack, [`azure-functions-skills`](https://github.com/Azure/azure-functions-skills) (public preview since 2026-06, `npx @azure/functions-skills install`: setup / create / deploy / diagnostics / doctor / health-status). Install both alongside this pack.
 
 ## What each plugin owns
 
@@ -21,7 +21,8 @@ This skill is **complementary** to [microsoft/azure-skills](https://github.com/m
 | `entra-app-registration` | App registration / federated credentials mechanics |
 | `azure-compliance` | Governance checks |
 | `azure-enterprise-infra-planner` | Enterprise-scale planning |
-| `azure-messaging`, `azure-storage`, `azure-ai`, `azure-aigateway`, ... | Service-specific Q&A |
+| `azure-messaging`, `azure-storage`, `azure-ai`, `azure-aigateway`, `azure-kusto`, `azure-compute`, `azure-cloud-migrate`, `azure-resource-visualizer`, `microsoft-foundry` | Service-specific Q&A |
+| `azure-functions-skills` (separate pack) | Functions project setup, deploy, doctor, live health |
 
 **This plugin** (opinionated, low-cost web-app scaffold + battle-tested gotchas):
 
@@ -66,7 +67,7 @@ User task starts here.
 │     Microsoft: azure-upgrade for generic upgrade flows
 │
 └─ "I hit an error — was it documented?"
-   └─ This plugin: diagnosing-azure-deployment-failures (37+ entries)
+   └─ This plugin: diagnosing-azure-deployment-failures (56 entries)
       Falls back to Microsoft: azure-diagnostics for live triage
 ```
 

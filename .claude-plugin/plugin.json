@@ -1,8 +1,8 @@
 {
   "name": "azure-lean-stack-skills",
   "displayName": "Azure Lean Stack",
-  "version": "2.2.0",
-  "description": "Azure Lean Stack — Claude Code skills for building Azure web apps that cost nothing when nobody's using them and scale up cleanly when they do. 16 composable skills, 38+ documented gotchas, local→test→prod branch-per-environment CI/CD. Every pattern proven in a real production project. Complementary to Microsoft's azure-skills plugin.",
+  "version": "2.3.0",
+  "description": "Azure Lean Stack \u2014 Claude Code skills for building Azure web apps that cost nothing when nobody's using them and scale up cleanly when they do. 17 composable skills, 56 documented gotchas, local\u2192test\u2192prod branch-per-environment CI/CD, managed identity wherever the host supports it, cost guardrails that are enforced (audit scripts + budget/stuck-warm alerts). Every pattern proven in a real production project. Complementary to Microsoft's azure-skills plugin.",
   "tagline": "Azure apps that cost nothing when nobody's using them.",
   "author": {
     "name": "Alex Pizarro",
@@ -40,6 +40,12 @@
     "multi-tenant",
     "cost-guardrails",
     "microsoft-consulting",
-    "power-platform-bridge"
+    "power-platform-bridge",
+    "managed-identity",
+    "keda-cron",
+    "cost-alerts",
+    "budgets",
+    "vite",
+    "node-22"
   ]
 }

@@ -7,6 +7,8 @@ description: Captures Azure deployment learnings from real projects in a structu
 
 The feedback loop that keeps the [diagnosing-azure-deployment-failures](../diagnosing-azure-deployment-failures/SKILL.md) gotcha catalogue current. Capture lessons from real projects in `learnings/`, then promote recurring ones into the catalogue.
 
+> `learnings/` is **gitignored** in the plugin repo — learnings are private field notes (they name customers, subscriptions and costs). Only the *promoted* gotcha row is shared. The commit SHA recorded in a learning's Status line therefore points at the gotcha commit, and is for the author's own audit trail. Keep learnings in whichever private location suits you (`LEARNINGS_DIR` overrides the default for every script).
+
 ## When to invoke
 
 - A deployment problem was solved — capture it before it's forgotten
@@ -58,7 +60,7 @@ and the Bicep template.
 
 Files changed: `azure/deploy.sh:83`, `infra/modules/crawler.bicep:42`.
 
-Status: ✅ Promoted as gotcha #31/#38 in commit abc1234.
+Status: ✅ Promoted — docker-hub-rate-limit → gotcha #31, crawl4ai-pinning → gotcha #38 (commit abc1234).
 ```
 
 The frontmatter is machine-readable; the body is for humans.
@@ -107,9 +109,19 @@ Given an issue tag, generates the markdown row to add to `gotchas.md`:
 ```bash
 bash skills/curating-azure-deployment-learnings/scripts/promote-to-gotchas.sh docker-hub-rate-limit
 
-# Output (paste into gotchas.md):
-# | 38 | Docker Hub anonymous pull rate-limited in CI | 100 pulls/6h per IP | Pin tag + mirror to ACR/GHCR |
+# Output: the learnings that carry the tag, then a blank row skeleton to fill in:
+# | N | <Symptom> | <Root cause> | <Fix> |
 ```
+
+Number it `max(existing) + 1` and insert it under the most relevant category (numbers are stable ids, not positions).
+
+## Verify before you promote
+
+A reviewer reading only source and config will confidently describe failure modes that don't exist. During the 2026-07 ACA idle-burn review, two strong models produced five plausible P1 findings that one live query each disproved — and the author's own first draft carried a false platform rule ("external ingress can't scale to zero") reached by reasoning from a single pinned app. Before a learning becomes a gotcha:
+
+1. **Find a counter-example**, not a confirmation: if the claim is "X always causes Y", query the estate for X without Y.
+2. Prefer a live read (`az … show`, billing by ResourceId, replica list) over a screenshot of config.
+3. If the claim is about cost, prove it in daily billing per resource (cost-guardrails Guardrail #14).
 
 ## Promotion criteria
 

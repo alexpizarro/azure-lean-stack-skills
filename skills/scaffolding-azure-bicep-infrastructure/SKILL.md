@@ -41,23 +41,28 @@ For a basic SWA + SQL project:
 
 ```
 infra/
-├── main.bicep
+├── main.bicep                       — subscription-scoped root, toggles: deploySql / deployStorage / deployObservability, sqlSku
 ├── environments/
 │   ├── test.parameters.json
 │   └── prod.parameters.json
 ├── modules/
 │   ├── resourceGroup.bicep
 │   ├── staticWebApp.bicep
-│   └── sqlServer.bicep
+│   ├── sqlServer.bicep              — Serverless (default) or Basic via sqlSku
+│   ├── storageAccount.bicep         — copy of optimizing-azure-blob-storage-cost's template (used when deployStorage)
+│   └── applicationInsights.bicep    — copy of instrumenting-azure-app-insights's template (used when deployObservability)
 └── sql/migrations/
     ├── 000_migration_history.sql
     └── 001_create_items_table.sql
 .github/workflows/
 ├── deploy-test.yml
-└── deploy-prod.yml
+├── deploy-prod.yml
+└── pr-checks.yml
+scripts/ci/install-sqlcmd.sh         — called by both deploy workflows
+.nvmrc                               — 22
 ```
 
-Add modules only when their toggle is true.
+All modules ship so `main.bicep` compiles standalone; the optional ones are only *deployed* when their toggle is true. `storageAccount.bicep` and `applicationInsights.bicep` are verbatim copies of the canonical templates in their owning skills (header comment says so) — edit the canonical file and re-copy.
 
 ## The modular toggle pattern
 
@@ -65,17 +70,18 @@ Add modules only when their toggle is true.
 
 ```bicep
 @allowed(['test', 'prod'])
-param environment string
+param environmentName string
 
 param deploySql bool = true
 param deployStorage bool = false
 param deployObservability bool = false
-param deployContainerApp bool = false
 
-module sqlServer 'modules/sqlServer.bicep' = if (deploySql) { ... }
+module sql 'modules/sqlServer.bicep' = if (deploySql) { ... }
 module storage 'modules/storageAccount.bicep' = if (deployStorage) { ... }
-module ai 'modules/applicationInsights.bicep' = if (deployObservability) { ... }
+module observability 'modules/applicationInsights.bicep' = if (deployObservability) { ... }
 ```
+
+Container Apps are not a toggle on this root — they need their own managed environment, registry and image pipeline. Add them with [deploying-azure-container-apps](../deploying-azure-container-apps/SKILL.md) as a second root or a separate module set.
 
 Outputs that depend on optional modules use the `!` non-null assertion guarded by the boolean:
 
@@ -118,10 +124,15 @@ See [references/per-env-sku.md](references/per-env-sku.md).
 
 The workflow files in [templates/.github/workflows/](templates/.github/workflows/) include:
 
-- OIDC login via `azure/login@v2`
-- **Conditional Bicep**: `git diff` checks `infra/` paths, skips Bicep + migrations on code-only pushes (saves 3–5 min/run)
+- OIDC login via `azure/login@v3`, `actions/checkout@v6` (Node 24 actions — Node 20 leaves GitHub runners 2026-09-23)
+- **`concurrency`**: test cancels a superseded in-flight run (saves paid Actions minutes); prod never cancels (a half-applied prod deploy is worse than a queued one)
+- **Conditional Bicep**: `git diff` checks `infra/` paths, skips Bicep + migrations on code-only pushes (saves 3–5 min/run). Plain `git`, not a third-party action, in a credentials-bearing workflow
 - **SWA token fallback**: when Bicep is skipped, fetches the SWA deployment token via `az staticwebapp secrets list`
-- SQL password masked with `::add-mask::`
+- **App Insights wiring**: when `deployObservability` is on, sets `APPLICATIONINSIGHTS_CONNECTION_STRING` on the SWA from the Bicep output
+- SQL migrations via `scripts/ci/install-sqlcmd.sh` (copied from `managing-azure-sql-migrations`) + a `nullglob` loop with `trap`-guaranteed firewall cleanup
+- `--location` read from the parameter file, not hard-coded
+- SQL password and tokens masked with `::add-mask::`
+- `pr-checks.yml`: typecheck + build for `frontend/` and `api/` on every PR; Node from `.nvmrc`
 
 See the deployment workflow files in `templates/.github/workflows/` for the complete pattern.
 
@@ -144,5 +155,11 @@ See the deployment workflow files in `templates/.github/workflows/` for the comp
 | [templates/infra/modules/sqlServer.bicep](templates/infra/modules/sqlServer.bicep) | SQL Server + Serverless DB |
 | [templates/infra/environments/test.parameters.json](templates/infra/environments/test.parameters.json) | Test env params |
 | [templates/infra/environments/prod.parameters.json](templates/infra/environments/prod.parameters.json) | Prod env params |
+| [templates/infra/modules/storageAccount.bicep](templates/infra/modules/storageAccount.bicep) | Storage + lifecycle + CORS (copy of the blob-cost skill's template) |
+| [templates/infra/modules/applicationInsights.bicep](templates/infra/modules/applicationInsights.bicep) | Workspace-based App Insights + daily cap (copy of the App Insights skill's template) |
+| [templates/infra/sql/migrations/](templates/infra/sql/migrations/) | `000_migration_history.sql`, `001_create_items_table.sql` |
 | [templates/.github/workflows/deploy-test.yml](templates/.github/workflows/deploy-test.yml) | Test deploy workflow |
 | [templates/.github/workflows/deploy-prod.yml](templates/.github/workflows/deploy-prod.yml) | Prod deploy workflow |
+| [templates/.github/workflows/pr-checks.yml](templates/.github/workflows/pr-checks.yml) | PR typecheck + build gate |
+| [templates/scripts/ci/install-sqlcmd.sh](templates/scripts/ci/install-sqlcmd.sh) | sqlcmd installer called by the deploy workflows |
+| [templates/.nvmrc](templates/.nvmrc) | Node 22 pin shared by CI, Oryx and local dev |

@@ -6,6 +6,65 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/) a
 
 ---
 
+## [2.3.0] — 2026-09-14
+
+Peer-review release: every pinned version re-verified against npm, GitHub releases, Microsoft Learn and `az provider show`; every Bicep template compiles; the field learnings from `trg-directory-*`, `bc-videohub-lite`, `BC Quick Check In` and `count8-website` (May → September 2026) folded in.
+
+### Added
+
+- **New skill:** [`securing-azure-sql-and-storage-with-managed-identity`](skills/securing-azure-sql-and-storage-with-managed-identity/SKILL.md) — Entra-token SQL auth + user-delegation SAS from the compute's system-assigned MI, flag-gated (`SQL_AUTH_MODE` / `STORAGE_AUTH_MODE`) with password/key kept as rollback. Includes the Entra-admin + MI-DB-user + storage-RBAC setup, the async delegation-key priming hook, the Bicep-resets-app-settings durability trap, and a narrower-roles table (custom job-start role, `AcrPull` vs `AcrPush`, keyless OpenAI). Proven in `bc-videohub-lite` (2026-07-17). Default for new FC1 / Container Apps APIs; not applicable to SWA managed functions.
+- **Cost Guardrail #15 + `templates/costGuardrails.bicep`** — Action Group + monthly Consumption budget on the RG (50/80/100 % actual + 100 % forecast), optional per-resource budget, and a `Replicas` Minimum > 0 for 1 h "stuck-warm" alert per scale-to-zero Container App. Deploy once out-of-band per environment. Proven in `bc-videohub-lite`.
+- **`scripts/check-live-replicas.sh`** — sweeps every Container App in every subscription and reports **running replicas** (never revisions — a revision-based check gave 6/6 false positives), `cooldownPeriod > 300`, `minReplicas > 0`.
+- **KEDA cron warm windows** on Container Apps — `warmWindowStart/End/Timezone` params on `containerApp.bicep`, `templates/scale-config.json` for `az rest` PATCH, full write-up in the ACA skill and `scale-to-zero.md`. Replaces "raise the cooldown" (which cost A$56/mo in `bcci-app`) with a ~A$0.02/day window.
+- **Container App retirement checklist** and the three Job traps (`--replica-retry-limit 0` silently ignored; `/start` body replaces env; `{template:…}` wrapper silently empty), plus shared cross-subscription ACR guidance.
+- **`sqlSku: 'Serverless' | 'Basic'`** on the scaffold's `sqlServer.bicep` / `main.bicep` / parameter files — the Basic switch both steady-traffic projects made.
+- **Scaffold now wires `deployStorage` and `deployObservability`** — `infra/modules/storageAccount.bicep` and `applicationInsights.bicep` ship as marked copies of the canonical templates, `main.bicep` deploys them behind the toggles and outputs the App Insights connection string, and the deploy workflows set it on the SWA. The 2.2.0 eval that asserted this now passes against the template.
+- **`api/src/functions/health.ts`** ships in the SWA template — shallow by default, `?deep=1` probes SQL, three-state result.
+- **`templates/multi-container.yaml`** (was referenced but never shipped), `templates/scripts/ci/install-sqlcmd.sh`, `templates/.nvmrc`.
+- **Gotchas #46–#56:** `Azure/functions-action` outage, Kudu quick-succession abort, v4 host not discovering functions from a fresh zip, 503 after Bicep reset app settings, `az acr build` "could not be found" (AcrPush / cross-sub), replica stuck `Activating` on ImagePullFailure (A$420/mo), `--replica-retry-limit 0`, Job start env override, SWA edge overwrites `Authorization`, `gh workflow run` without `--ref`, SQL Server 2025 AVX crash on Apple Silicon. Quick symptom table now covers all 56.
+- **Verify-before-promote** rule in the curating skill (two external reviewers produced five wrong P1s from config alone).
+
+### Changed
+
+- **Versions (2026-09-14):** `azure/login` v2 → **v3**, `actions/checkout` / `setup-node` v4 → **v6** (Node 20 actions leave GitHub runners 2026-09-23), **Vite 6 → 8** + `@vitejs/plugin-react` 4 → 6, **mssql 11 → 12** (config objects no longer cloned) + `@types/mssql` 9 → 12, `@azure/functions` ^4.5 → ^4.16, React ^19.3, TypeScript ^5.9, Azurite pinned to 3.37.0. Template lockfiles regenerated. `stack-versions.md` rewritten with a per-resource Bicep API-version table.
+- **Bicep API versions** bumped to the newest stable that has types in the `az`-bundled Bicep 0.41 *and* 0.47: `Microsoft.App/*@2025-01-01`, `Microsoft.Web/staticSites@2024-04-01`, `Microsoft.Web/sites|serverfarms@2024-04-01`, `Microsoft.Sql/*@2023-08-01` (was `-preview`), `Microsoft.Storage/*@2024-01-01` (was split 2023-01-01 / 2023-05-01), `Microsoft.OperationalInsights/workspaces@2025-02-01`, `Microsoft.Communication/*@2025-09-01`, `Microsoft.Resources/resourceGroups@2024-03-01`, `CostManagement/query?api-version=2024-08-01`.
+- **FC1 is CommonJS, not ESM.** The v1-era "FC1 = `"type": "module"` + `.js` import suffixes" rule was never proven; `bc-videohub-lite`'s FC1 API is CommonJS and Azure Functions' ESM support is still `.mjs`-only preview. `api/` now moves from SWA to FC1 unchanged.
+- **FC1 deploys with `az functionapp deployment source config-zip` + restart**, not `Azure/functions-action` (disabled on GitHub 2026-06-05 → 06-10). Architecture Decision #9 codifies "no third-party marketplace action in the deploy path". `flexConsumption.bicep` exposes `instanceMemoryMB` (512 / 2048 / 4096) and pins `alwaysReady: []`.
+- **Deploy workflows:** `concurrency` (test cancels, prod never), `--location` from the parameter file, `nullglob` migration loop, sqlcmd via `scripts/ci/install-sqlcmd.sh` (one copy, not three), App Insights wiring, `pr-checks.yml` reads `.nvmrc`. Templates gain `typecheck` scripts so `pr-checks.yml` no longer fails on a fresh scaffold, `engines.node`, and a real `dev:test` script driven by `VITE_PROXY_TARGET`.
+- **`staticwebapp.config.json`** template: `platform.apiRuntime: node:22`, full security-header set, no legacy `/*` catch-all route.
+- **Guardrail #9** rewritten for FC1 + `alwaysReady`; Y1 Linux Consumption retirement date (2028-09-30) recorded; the App Service B1 "known floor" reconciled as the one documented exception.
+- **Audit scripts:** `audit-sku-overrides.sh` storage-lifecycle check could never fire (stray quote) — fixed; adds `cooldownPeriod > 300` and a missing-budget INFO. `audit-cost-antipatterns.sh` no longer flags `?deep=`/`?probe=`-gated health checks; the CI-resurrection check is now a WARN so it gates.
+- **OIDC:** `--sdk-auth` → `--json-auth`; branch-guard step and `--ref` for manual dispatch; the temp secrets file is `umask 077` + removed on `trap EXIT`.
+- **SWA skill:** hosting decision table now includes App Service B1 (Next.js ISR over the 500 MB SWA ceiling) and Container Apps for Next.js with middleware; managed functions' no-MI / no-Key-Vault limit stated; `Authorization`-header overwrite documented.
+- **Curating skill** and `learnings/README.md`: the gitignored-learnings contradiction resolved (learnings are private; only gotcha rows are shared; frontmatter format documented where the scripts expect it).
+- Counts and structure fixed everywhere (README said 14 *and* 16 skills; plugin.json said 38+ gotchas; CLAUDE.md tree said v2.0.0).
+- `plugin.json` → `2.3.0`; 17 skills; keywords `managed-identity`, `keda-cron`, `cost-alerts`, `budgets`, `vite`, `node-22`.
+
+### Fixed
+
+- `containerAppJob.bicep` did not compile (BCP138: for-expression inside `union()`); `multi-tenant-main.bicep` did not compile (referenced five modules that weren't in the skill). Both compile; every `.bicep` in the pack is now compiled in review.
+- **From the independent Codex review of this release:** `sqlcmd` ran without `-b`, so a failed migration reported success (workflows + both migration scripts); the SQL-migration step ran even when `deploySql=false`; `-U sqladmin` was hard-coded although `sqlAdminLogin` is a parameter; `generate-sql-password.sh` used `shuf` (absent on macOS) and `tr | head` under `pipefail` (SIGPIPE) — replaced with a python3 `secrets` generator; `containerAppJob.bicep` accepted `triggerType: 'Event'` but emitted no scale rules (now `eventScaleRules`); `flexConsumption.bicep` documented a role assignment it never created (now `assignHostStorageRole`, default on); `applicationInsights.bicep` `substring(...,0,12)` failed for short base names; the MI runtime sample parsed only `Initial Catalog=` (the scaffold emits `Database=`), needed an undocumented `STORAGE_ACCOUNT_KEY`, and built blob URLs without a `/`; `db_ddladmin` was granted by default (now opt-in); Storage Blob Delegator is documented as required only for container-scoped grants (Data Contributor at account scope already includes `generateUserDelegationKey`); ACS Email was described as "100/day free" — it is $0.00025/email with a 10/hour cap on Azure-managed domains; SWA Free quotas corrected (10 apps, 500 MB total / 250 MB per environment); the frontend template lacked `@types/node` for `vite.config.ts`; `getItems`/`createItem` lacked the documented mock guard; migration loops were not whitespace-safe; `audit-sku-overrides.sh` now exits 3 on WARN-only, checks budget and stuck-warm alert independently, and the anti-pattern audit only excuses a DB health check when the DB call sits *after* a `deep`/`probe` gate, parses the Logic App interval, matches plain `* * * * *`, ignores import lines, and accepts a `RETIRED_RESOURCES` denylist; `check-live-replicas.sh` exits 2 on any failed query instead of reporting zero replicas.
+- `database.ts` didn't export `getPool` although the docs imported it.
+- `deploying-azure-container-apps/SKILL.md` linked a `multi-container.yaml` that didn't exist.
+- `managing-azure-sql-migrations/SKILL.md` claimed the workflows *call* its scripts; they inlined a third copy.
+- Placeholder mismatches (`YOUR_PASSWORD` vs `YOUR_SQL_PASSWORD`), template package names still on the pre-rename brand.
+
+### Proven sources
+
+- `bc-videohub-lite` — MI cutover, budgets + stuck-warm alerts, az-CLI zip deploy, `always()` settings restore, SQL Basic, CommonJS FC1, Vite 8.
+- `trg-directory-website` — App Service B1 for ISR, cost sentinel, deploy-freshness gate, Kudu/config-zip gotchas, direct-ARM job start, `azure/login@v3` + `checkout@v6`.
+- `trg-directory-content-crawl` — HTTP app → Job retirement, structural workflow tests, shared ACR, ImagePullFailure burn.
+- `BC Quick Check In` — KEDA cron warm window replacing `cooldownPeriod: 7200`, `az rest` PATCH shape.
+- `count8-website` — SWA `Authorization` overwrite, apex-alias DNS cutover.
+
+### Still waiting for a proven project (unchanged from 2.1.0, plus)
+
+- Automation-runbook auto-remediation for a stuck-warm app (`bc-videohub-lite` has it; one project isn't the bar for a template that restarts prod).
+- A generic deploy-freshness gate template (`build-info.json` + route probe) — described in the orchestrator, not templated.
+- App Service B1 as a pack skill (one project; documented as a hosting-table row and a known floor instead).
+
+---
+
 ## [2.2.0] — 2026-05-26
 
 ### Added

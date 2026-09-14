@@ -6,6 +6,9 @@
 
 set -euo pipefail
 
+# Never leave the password file behind, even if a `gh secret set` fails.
+trap 'rm -f /tmp/azure-oidc-vars.sh' EXIT
+
 if [[ -f /tmp/azure-oidc-vars.sh ]]; then
   # shellcheck disable=SC1091
   source /tmp/azure-oidc-vars.sh
@@ -31,7 +34,7 @@ echo ""
 echo "Verifying..."
 gh secret list | grep -E "AZURE_|SQL_ADMIN_PASSWORD_"
 
-# Clean up the temp file containing passwords
+# Clean up the temp file containing passwords (also on failure — see trap above)
 rm -f /tmp/azure-oidc-vars.sh
 echo ""
 echo "✓ Done. Cleaned up /tmp/azure-oidc-vars.sh"

@@ -34,6 +34,8 @@ var rgName       = '${baseName}-rg-${environmentName}'
 var swaName      = '${baseName}-swa-${environmentName}'
 var sqlServerName = '${baseName}-sql-${environmentName}'
 var sqlDbName    = '${baseName}-sqldb-${environmentName}'
+// Storage account names: lowercase alphanumeric, ≤24 chars, no hyphens.
+var storageAccountName = toLower(replace('${org}${project}store${environmentName}', '-', ''))
 
 // ---------------------------------------------------------------------------
 // Modular toggles — projects opt in to components they actually use
@@ -56,6 +58,10 @@ param sqlAdminLogin string = 'sqladmin'
 @secure()
 @description('SQL Server administrator password. Injected from GitHub Actions secret at deploy time.')
 param sqlAdminPassword string = ''
+
+@description('Serverless (auto-pause) for bursty traffic; Basic (flat ~$5/mo) when the DB is small and polled on a steady cadence. See cost-guardrails Guardrail #11.')
+@allowed(['Serverless', 'Basic'])
+param sqlSku string = 'Serverless'
 
 // ---------------------------------------------------------------------------
 // Observability inputs (only used when deployObservability = true)
@@ -98,6 +104,42 @@ module sql 'modules/sqlServer.bicep' = if (deploySql) {
     location: location
     administratorLogin: sqlAdminLogin
     administratorLoginPassword: sqlAdminPassword
+    sqlSku: sqlSku
+    tags: tags
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Storage (optional) — lifecycle rules + CORS. Canonical module lives in
+// optimizing-azure-blob-storage-cost; modules/storageAccount.bicep is a copy.
+// ---------------------------------------------------------------------------
+module storage 'modules/storageAccount.bicep' = if (deployStorage) {
+  name: 'deploy-storage-${environmentName}'
+  scope: resourceGroup(rgName)
+  dependsOn: [rg]
+  params: {
+    name: storageAccountName
+    location: location
+    corsAllowedOrigins: environmentName == 'prod'
+      ? ['https://${swa.outputs.defaultHostname}']
+      : ['https://${swa.outputs.defaultHostname}', 'http://localhost:5173']
+    tags: tags
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Observability (optional) — workspace-based App Insights with dailyQuotaGb cap.
+// Canonical module lives in instrumenting-azure-app-insights; this is a copy.
+// ---------------------------------------------------------------------------
+module observability 'modules/applicationInsights.bicep' = if (deployObservability) {
+  name: 'deploy-ai-${environmentName}'
+  scope: resourceGroup(rgName)
+  dependsOn: [rg]
+  params: {
+    baseName: baseName
+    environment: environmentName
+    location: location
+    alertEmail: alertEmail
     tags: tags
   }
 }
@@ -136,3 +178,7 @@ output swaHostname string = swa.outputs.defaultHostname
 output swaDeploymentToken string = swa.outputs.deploymentToken
 output sqlServerFqdn string = deploySql ? sql!.outputs.serverFqdn : ''
 output sqlDbName string = deploySql ? sqlDbName : ''
+output storageAccountName string = deployStorage ? storage!.outputs.name : ''
+output storageBlobEndpoint string = deployStorage ? storage!.outputs.primaryEndpoint : ''
+#disable-next-line outputs-should-not-contain-secrets
+output appInsightsConnectionString string = deployObservability ? observability!.outputs.connectionString : ''

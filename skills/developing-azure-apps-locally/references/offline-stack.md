@@ -11,7 +11,7 @@ Details for running the fully-offline local dev stack (SQL Server 2022 + Azurite
 
 ## Apple Silicon / amd64
 
-The SQL Server 2022 image (`mcr.microsoft.com/mssql/server:2022-latest`) is amd64-only. On Apple Silicon:
+The SQL Server 2022 image (`mcr.microsoft.com/mssql/server:2022-latest`) is amd64-only. Don't move to `2025-latest` for local dev yet — the RTM image requires AVX and dies under Docker Desktop's emulation on Apple Silicon (CU1 fixed it; OrbStack also emulates AVX). On Apple Silicon:
 
 1. Docker Desktop → Settings → General → enable **"Use Rosetta for x86/amd64 emulation"**.
 2. The `docker-compose.yml` pins `platform: linux/amd64` so compose doesn't try (and fail) to pull an arm64 variant.
@@ -49,18 +49,18 @@ This lets the whole app run offline without provisioning ACS, AI, etc. The same 
 
 ## `dev:test` vs fully-offline
 
-Add a `dev:test` script to `frontend/package.json` that points Vite at the deployed test SWA:
+The scaffolded `frontend/package.json` ships a `dev:test` script that proxies `/api` to the deployed **test** SWA instead of the local Functions host:
 
 ```json
 {
   "scripts": {
     "dev": "vite",
-    "dev:test": "vite --mode test"
+    "dev:test": "VITE_PROXY_TARGET=https://{org}-{project}-swa-test.azurestaticapps.net vite"
   }
 }
 ```
 
-With a `.env.test` setting the API base URL to the test SWA hostname. Use `dev:test` only for UI work that needs live test data; it does NOT run a local API or DB. For anything touching the API, SQL, or storage, use the fully-offline stack — it's faster and incurs no Azure cost.
+`vite.config.ts` reads `VITE_PROXY_TARGET` (default `http://localhost:7071`). Use `dev:test` only for UI work that needs live test data; it does NOT run a local API or DB, and it does wake the test SQL Serverless DB. Never point it at production. For anything touching the API, SQL, or storage, use the fully-offline stack — it's faster and incurs no Azure cost.
 
 ## Troubleshooting
 

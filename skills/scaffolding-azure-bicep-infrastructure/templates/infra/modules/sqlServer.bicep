@@ -8,7 +8,11 @@ param administratorLoginPassword string
 
 param tags object = {}
 
-resource sqlServer 'Microsoft.Sql/servers@2023-05-01-preview' = {
+@description('Serverless (auto-pause, bursty traffic) or Basic (flat ~$5/mo, always-on, steady traffic).')
+@allowed(['Serverless', 'Basic'])
+param sqlSku string = 'Serverless'
+
+resource sqlServer 'Microsoft.Sql/servers@2023-08-01' = {
   name: serverName
   location: location
   tags: tags
@@ -21,7 +25,7 @@ resource sqlServer 'Microsoft.Sql/servers@2023-05-01-preview' = {
 }
 
 // Allow connections from Azure-hosted services (including SWA managed functions)
-resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-05-01-preview' = {
+resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01' = {
   parent: sqlServer
   name: 'AllowAllAzureIPs'
   properties: {
@@ -30,19 +34,29 @@ resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-05-01-prev
   }
 }
 
-// Serverless tier: auto-pauses after 15 min of inactivity — lowest cost for low-volume apps
-resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
+// Serverless tier: auto-pauses after 15 min of inactivity — lowest cost for GENUINELY bursty apps.
+// If the DB is small and hit on a steady cadence (health checks, schedulers, polling), serverless
+// never pauses and costs MORE than flat Basic (~$5/mo) — see cost-guardrails Guardrail #11.
+// Switch with sqlSku = 'Basic' (proven: bc-videohub-lite, ~10x cheaper at its usage).
+resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01' = {
   parent: sqlServer
   name: databaseName
   location: location
   tags: tags
-  sku: {
+  sku: sqlSku == 'Basic' ? {
+    name: 'Basic'
+    tier: 'Basic'
+  } : {
     name: 'GP_S_Gen5_1'
     tier: 'GeneralPurpose'
     family: 'Gen5'
     capacity: 1
   }
-  properties: {
+  properties: sqlSku == 'Basic' ? {
+    collation: 'SQL_Latin1_General_CP1_CI_AS'
+    maxSizeBytes: 2147483648 // 2 GB (Basic ceiling)
+    requestedBackupStorageRedundancy: 'Local'
+  } : {
     collation: 'SQL_Latin1_General_CP1_CI_AS'
     autoPauseDelay: 15
     minCapacity: json('0.5')

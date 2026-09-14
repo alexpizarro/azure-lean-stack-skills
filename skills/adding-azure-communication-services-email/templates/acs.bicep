@@ -18,7 +18,7 @@ var emailServiceName = '${baseName}-emailsvc'
 var acsName          = '${baseName}-acs'
 
 // Email service — no dependencies
-resource emailService 'Microsoft.Communication/emailServices@2023-04-01' = {
+resource emailService 'Microsoft.Communication/emailServices@2025-09-01' = {
   name: emailServiceName
   location: 'global'
   tags: tags
@@ -28,7 +28,7 @@ resource emailService 'Microsoft.Communication/emailServices@2023-04-01' = {
 }
 
 // Domain — child of emailService
-resource emailDomain 'Microsoft.Communication/emailServices/domains@2023-04-01' = {
+resource emailDomain 'Microsoft.Communication/emailServices/domains@2025-09-01' = {
   parent: emailService
   name: 'AzureManagedDomain'
   location: 'global'
@@ -40,7 +40,7 @@ resource emailDomain 'Microsoft.Communication/emailServices/domains@2023-04-01' 
 }
 
 // Comms service — links to the domain
-resource acs 'Microsoft.Communication/communicationServices@2023-04-01' = {
+resource acs 'Microsoft.Communication/communicationServices@2025-09-01' = {
   name: acsName
   location: 'global'
   tags: tags

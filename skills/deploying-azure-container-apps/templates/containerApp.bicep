@@ -28,6 +28,30 @@ param memory string = '1Gi'
 @description('Concurrent requests per replica before scaling up.')
 param concurrentRequests int = 10
 
+// "The second minReplicas" (cost-guardrails Guardrail #12b, gotcha #42). Seconds the
+// last replica stays alive after traffic stops. If this exceeds your mean inter-arrival
+// time the app NEVER scales to zero, invisibly. Leave at the 300s default; for a known
+// busy window use the optional KEDA cron rule below instead of raising this.
+@description('Scale-to-zero cooldown (seconds). Keep at 300 — raising it is a hidden always-on replica.')
+param cooldownPeriod int = 300
+
+// Optional warm window — a KEDA `cron` rule that pins `warmReplicas` between two cron
+// expressions in an IANA timezone (DST handled by the platform). KEDA takes max(rules),
+// so HTTP scaling still works inside the window and the app sleeps at 0 outside it.
+// Proven: bcci-app (BC Quick Check In) — replaced a 7200s cooldown that cost A$56/mo
+// with a Tue 17:45–23:30 window costing ~A$0.02/day.
+@description('Optional warm window: cron start expression (e.g. "45 17 * * 2"). Empty = no cron rule.')
+param warmWindowStart string = ''
+
+@description('Warm window: cron end expression (e.g. "30 23 * * 2"). Required together with warmWindowStart.')
+param warmWindowEnd string = ''
+
+@description('Warm window: IANA timezone (e.g. "Australia/Sydney").')
+param warmWindowTimezone string = 'Australia/Sydney'
+
+@description('Warm window: replicas to hold during the window.')
+param warmReplicas int = 1
+
 @description('Ingress external (public) or internal (env-only).')
 param ingressExternal bool = true
 
@@ -56,7 +80,32 @@ var secretEnv = [for k in items(secretEnvVars): {
   secretRef: k.value
 }]
 
-resource app 'Microsoft.App/containerApps@2024-03-01' = {
+var httpRule = {
+  name: 'http-scaling'
+  http: {
+    metadata: {
+      concurrentRequests: string(concurrentRequests)
+    }
+  }
+}
+
+var cronRule = {
+  name: 'warm-window'
+  custom: {
+    type: 'cron'
+    metadata: {
+      timezone: warmWindowTimezone
+      start: warmWindowStart
+      end: warmWindowEnd
+      desiredReplicas: string(warmReplicas)
+    }
+  }
+}
+
+// The cron rule is only emitted when BOTH start and end are set (KEDA rejects an empty end).
+var scaleRules = (empty(warmWindowStart) || empty(warmWindowEnd)) ? [httpRule] : [httpRule, cronRule]
+
+resource app 'Microsoft.App/containerApps@2025-01-01' = {
   name: name
   location: location
   tags: tags
@@ -115,16 +164,9 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       scale: {
         minReplicas: minReplicas
         maxReplicas: maxReplicas
-        rules: [
-          {
-            name: 'http-scaling'
-            http: {
-              metadata: {
-                concurrentRequests: string(concurrentRequests)
-              }
-            }
-          }
-        ]
+        cooldownPeriod: cooldownPeriod
+        // Non-HTTP scale rules (cron) require activeRevisionsMode: 'Single' (set above).
+        rules: scaleRules
       }
     }
   }

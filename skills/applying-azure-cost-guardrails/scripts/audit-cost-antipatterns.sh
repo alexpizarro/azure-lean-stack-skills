@@ -4,9 +4,13 @@
 #
 # Detects:
 #   1. health/status/ping/keepalive endpoints that run a DB query (keeps SQL
-#      Serverless awake on every poll)
+#      Serverless awake on every poll)                              — Guardrail #11
 #   2. frequent schedulers (Logic App Recurrence / cron <= 15 min) that may be
-#      pointed at a DB-backed endpoint
+#      pointed at a DB-backed endpoint                              — Guardrail #11
+#   3. cooldownPeriod > 300s ("the second minReplicas")             — Guardrail #12b
+#   4. setInterval UI polling without a tab-visibility gate          — Guardrail #12a
+#   5. anonymous health endpoint probing a downstream service        — Guardrail #12a
+#   6. deploy workflows that update / health-curl a Container App    — Guardrail #13
 #
 # Usage: bash audit-cost-antipatterns.sh [path]    (default: .)
 # Exit:  non-zero if any [WARN] findings (so it can gate CI).
@@ -60,8 +64,17 @@ name_re='health|status|ping|keepalive|keep-alive|warmup|heartbeat|liveness|readi
 
 while IFS= read -r f; do
   [ -z "$f" ] && continue
-  # The file is name-matched; now find the first DB-access line for the pointer.
-  line=$(grep -nEi "$db_re" "$f" 2>/dev/null | head -1 | cut -d: -f1)
+  # The file is name-matched; now find the first DB-access line for the pointer
+  # (skipping import/require lines — importing getPool is not calling it).
+  line=$(grep -nEi "$db_re" "$f" 2>/dev/null | grep -vE "^[0-9]+:\s*(import\b|const .*= require\()" | head -1 | cut -d: -f1)
+  # Mitigated only if the DB access sits INSIDE an explicit opt-in branch: the file must
+  # read a `deep` / `probe` query flag AND the first DB access must come after that read.
+  if [ -n "$line" ]; then
+    gate=$(grep -nEi "query\.get\(['\"](deep|probe)['\"]\)|searchParams\.get\(['\"](deep|probe)['\"]\)|\?(deep|probe)=" "$f" 2>/dev/null | head -1 | cut -d: -f1)
+    if [ -n "$gate" ] && [ "$gate" -lt "$line" ]; then
+      line=""
+    fi
+  fi
   if [ -n "$line" ]; then
     report "WARN" "$f" "$line" "health/status endpoint queries the DB — keeps SQL Serverless awake on every poll. Make /health DB-free; gate the DB check behind ?deep=1 (Guardrail #11)."
   fi
@@ -70,11 +83,15 @@ done < <(find "${SRC_DIRS[@]}" -type f \( -name "*.ts" -o -name "*.js" -o -name 
            | grep -iE "/($name_re)[^/]*\.(ts|js|py|cs)$" )
 
 # ── 2. frequent schedulers (Recurrence interval <= 15 min) ─────────────────
-# Logic App Bicep / definitions: look for frequency Minute with small interval.
+# Logic App Bicep / definitions: frequency Minute AND an interval of 1–15 within the
+# next few lines (a 30- or 60-minute Minute-recurrence is fine).
 while IFS= read -r hit; do
   [ -z "$hit" ] && continue
   f="${hit%%:*}"; rest="${hit#*:}"; line="${rest%%:*}"
-  report "WARN" "$f" "$line" "frequent scheduler (Minute cadence). If it targets a DB-backed endpoint it keeps SQL Serverless awake. Point it at a DB-free endpoint, or use flat Basic tier (Guardrail #11)."
+  interval=$(sed -n "${line},$((line+6))p" "$f" 2>/dev/null | grep -oEi "interval['\"]?\s*[:=]\s*[0-9]+" | grep -oE "[0-9]+" | head -1)
+  if [ -n "$interval" ] && [ "$interval" -le 15 ]; then
+    report "WARN" "$f" "$line" "scheduler every ${interval} min. If it targets a DB-backed endpoint it keeps SQL Serverless awake. Point it at a DB-free endpoint, or use flat Basic tier (Guardrail #11)."
+  fi
 done < <(grep "${PRUNE[@]}" -rInE "frequency['\"]?\s*[:=]\s*['\"]Minute['\"]" "$TARGET" \
            --include="*.bicep" --include="*.json" --include="*.sh" 2>/dev/null \
            | grep -ivE "$EXCLUDE_RE" | grep -vE "$SELF_RE")
@@ -84,7 +101,7 @@ while IFS= read -r hit; do
   [ -z "$hit" ] && continue
   f="${hit%%:*}"; rest="${hit#*:}"; line="${rest%%:*}"
   report "WARN" "$f" "$line" "sub-15-min cron schedule. If it hits a DB-backed endpoint it keeps SQL Serverless awake (Guardrail #11)."
-done < <(grep "${PRUNE[@]}" -rInE "(\*/[1-9]|\*/1[0-5])\s+\*\s+\*\s+\*\s+\*|cronExpression['\"]?\s*[:=]\s*['\"]\*/[1-9]" "$TARGET" \
+done < <(grep "${PRUNE[@]}" -rInE "(^|['\"[:space:]])(\*|\*/[1-9]|\*/1[0-5])\s+\*\s+\*\s+\*\s+\*(['\"[:space:]]|$)|cronExpression['\"]?\s*[:=]\s*['\"](\*|\*/[1-9])" "$TARGET" \
            --include="*.bicep" --include="*.json" --include="*.sh" --include="*.yml" --include="*.yaml" 2>/dev/null \
            | grep -ivE "$EXCLUDE_RE" | grep -vE "$SELF_RE")
 
@@ -132,6 +149,18 @@ done < <(find "${SRC_DIRS[@]}" -type f \( -name "*.ts" -o -name "*.js" -o -name 
            | grep -ivE "$EXCLUDE_RE" | grep -vE "$SELF_RE" \
            | grep -iE "/($name_re)[^/]*\.(ts|js|py|cs)$" )
 
+# ── 6b. explicit denylist: names of resources you have retired ─────────────
+# RETIRED_RESOURCES="trg-enrichment-aca my-old-app" bash audit-cost-antipatterns.sh .
+# Any workflow/script that still mentions one of these is a FAIL-grade WARN.
+for name in ${RETIRED_RESOURCES:-}; do
+  while IFS= read -r hit; do
+    [ -z "$hit" ] && continue
+    f="${hit%%:*}"; rest="${hit#*:}"; line="${rest%%:*}"
+    report "WARN" "$f" "$line" "references RETIRED resource '$name' — CI will recreate / re-wake it on the next deploy (Guardrail #13, gotcha #43)."
+  done < <(grep "${PRUNE[@]}" -rInF -- "$name" "$TARGET/.github" "$TARGET/scripts" "$TARGET/azure" "$TARGET/infra" 2>/dev/null \
+             | grep -ivE "$EXCLUDE_RE" | grep -vE "$SELF_RE")
+done
+
 # ── 6. CI resurrecting a retired resource (Guardrail #13) ──────────────────
 # A deploy workflow that updates or health-curls an app you've retired will
 # recreate and re-wake it on EVERY deploy. Proven: recurred twice this way.
@@ -139,7 +168,7 @@ if [ -d "$TARGET/.github/workflows" ]; then
   while IFS= read -r hit; do
     [ -z "$hit" ] && continue
     f="${hit%%:*}"; rest="${hit#*:}"; line="${rest%%:*}"
-    report "INFO" "$f" "$line" "workflow updates/probes a Container App. If this app has been retired, CI will resurrect it on every deploy — grep workflows for the resource name as part of retirement (Guardrail #13)."
+    report "WARN" "$f" "$line" "workflow updates or health-curls a Container App. If that app is retired this step either fails every deploy or re-wakes a billed replica — grep workflows for the resource name as part of retirement; verify deploys by asserting the image tag, never by curling a URL (Guardrail #13). Add the name to RETIRED_RESOURCES to make this a hard failure."
   done < <(grep "${PRUNE[@]}" -rInE "containerapp update|curl.*(/health|/api/status)" "$TARGET/.github/workflows" 2>/dev/null \
              | grep -ivE "$EXCLUDE_RE" | grep -vE "$SELF_RE")
 fi

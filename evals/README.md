@@ -18,12 +18,20 @@ Each `*.json` file is one scenario:
   ],
   "ground_truth": {
     "must_invoke": ["skill-A", "skill-B"],
+    "may_invoke": ["skill-C"],
     "must_not_invoke": ["skill-Z"],
     "must_run_commands": ["az some-command pattern"],
-    "must_avoid_commands": ["az functionapp create --flexconsumption-location"]
+    "must_avoid_commands": ["az functionapp create --flexconsumption-location"],
+    "must_mention": ["phrase the answer must contain"],
+    "must_have_in_bicep": ["dailyQuotaGb"],
+    "must_not_have_in_bicep": ["tierToArchive"],
+    "must_warn_before_implementing": true,
+    "must_not_produce": ["a handler that queries the DB on every call"]
   }
 }
 ```
+
+All `ground_truth` keys are optional; use the ones the scenario needs.
 
 ## How to use
 
@@ -46,10 +54,11 @@ Run the same scenario on:
 | Skill | Scenarios shipped | Scenarios target |
 |-------|------------------|------------------|
 | orchestrating-azure-deployments | 1 | 3 |
-| scaffolding-azure-bicep-infrastructure | 2 | 3 |
+| scaffolding-azure-bicep-infrastructure | 1 | 3 |
 | diagnosing-azure-deployment-failures | 1 | 3 |
 | developing-azure-apps-locally | 1 | 3 |
-| applying-azure-cost-guardrails | 1 | 3 |
-| (all others) | 0 | 3 |
+| applying-azure-cost-guardrails | 2 | 3 |
+| deploying-azure-container-apps | 1 | 3 |
+| (all other 11 skills) | 0 | 3 |
 
 Adding more scenarios is a high-leverage contribution.

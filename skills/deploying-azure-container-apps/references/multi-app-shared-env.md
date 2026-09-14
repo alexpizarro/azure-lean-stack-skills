@@ -65,7 +65,7 @@ module syncJob 'modules/containerAppJob.bicep' = {
 Always declare a Consumption profile so child apps/jobs can opt into scale-to-zero:
 
 ```bicep
-resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
+resource env 'Microsoft.App/managedEnvironments@2025-01-01' = {
   properties: {
     appLogsConfiguration: {
       destination: 'log-analytics'
@@ -88,7 +88,7 @@ Each child app/job then sets `workloadProfileName: 'Consumption'`.
 Attach a workspace with a daily cap so a runaway log volume can't blow up the bill:
 
 ```bicep
-resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+resource workspace 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   properties: {
     sku: { name: 'PerGB2018' }
     retentionInDays: 30

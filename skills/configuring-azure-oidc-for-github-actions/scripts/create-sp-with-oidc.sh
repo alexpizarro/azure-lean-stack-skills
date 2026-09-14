@@ -95,7 +95,9 @@ Summary — save these values for the GitHub secret step:
 ─────────────────────────────────────────────────────────────────
 EOF
 
-# Persist for sibling scripts in the same shell session
+# Persist for sibling scripts in the same shell session (owner-only: the SQL password
+# script appends secrets to this file).
+umask 077
 cat > /tmp/azure-oidc-vars.sh <<EOF
 export AZURE_TENANT_ID="$TENANT_ID"
 export AZURE_SUBSCRIPTION_ID="$SUBSCRIPTION_ID"

@@ -26,6 +26,7 @@ OIDC + GitHub Actions setup:
 - [ ] Step 5: Run scripts/add-github-secrets.sh → 6 secrets set
 - [ ] Step 6: For each additional environment branch (acme-demo, customer-uat, etc.), re-run with that branch name
 - [ ] Step 7: First push to test → verify the workflow authenticates (no AADSTS70021)
+- [ ] Step 8: Workflows use azure/login@v3 (Node 24) — v2 stops working when Node 20 leaves GitHub runners (2026-09-23)
 ```
 
 ## Setup sequence
@@ -104,12 +105,26 @@ az role assignment create \
 
 If the RG doesn't exist yet, scope to subscription temporarily.
 
-## SP creation gotcha — WARNING in stdout
+## Manual dispatch: OIDC credentials are branch-scoped
 
-`az ad sp create-for-rbac --sdk-auth` prepends a `WARNING:` line to stdout. If that ends up in `AZURE_CREDENTIALS` (the legacy format), authentication silently fails. **OIDC sidesteps this** — we only store the appId, never the SP JSON. But if you ever need `AZURE_CREDENTIALS`, strip the warning:
+`gh workflow run deploy-test.yml` from `main` fails with `AADSTS70021` — the token's `sub` claim carries the *dispatching* ref. Always pass `--ref test` / `--ref production`, and put a guard step first so the failure is a clear message rather than a confusing login error:
+
+```yaml
+- name: Guard branch
+  run: |
+    case "${{ github.ref_name }}" in test|production) ;; *)
+      echo "::error::Dispatch on 'test' or 'production' only (got '${{ github.ref_name }}'). OIDC creds are branch-scoped."; exit 1;;
+    esac
+```
+
+A workflow that serves both environments can pick the client id from the ref: `client-id: ${{ github.ref_name == 'production' && secrets.AZURE_CLIENT_ID_PROD || secrets.AZURE_CLIENT_ID_TEST }}`.
+
+## SP creation gotcha — WARNING in stdout, and `--sdk-auth` is deprecated
+
+`az ad sp create-for-rbac --sdk-auth` is **deprecated** (`--json-auth` is its replacement) and prepends a `WARNING:` line to stdout. If that ends up in `AZURE_CREDENTIALS` (the legacy format), authentication silently fails. **OIDC sidesteps all of this** — we only store the appId, never the SP JSON. If you ever must produce `AZURE_CREDENTIALS`, use `--json-auth` and strip the warning:
 
 ```bash
-az ad sp create-for-rbac ... --sdk-auth 2>/dev/null \
+az ad sp create-for-rbac ... --json-auth 2>/dev/null \
   | python3 -c "import sys,json; d=sys.stdin.read(); print(json.dumps(json.loads(d[d.find('{'):]),indent=2))"
 ```
 

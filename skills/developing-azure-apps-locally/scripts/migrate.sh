@@ -40,7 +40,8 @@ echo "Applying migrations to [$DB] ..."
 shopt -s nullglob
 files=("$ROOT"/infra/sql/migrations/*.sql)
 (( ${#files[@]} )) || { echo "No migration files found in infra/sql/migrations/"; exit 0; }
-for f in $(printf '%s\n' "${files[@]}" | sort); do
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
   echo "  -> $(basename "$f")"
   # -i needs the file readable by the sqlcmd process; when running in-container,
   # pipe the file in via stdin instead of -i (path isn't mounted).
@@ -49,5 +50,5 @@ for f in $(printf '%s\n' "${files[@]}" | sort); do
   else
     run_sql -b -d "$DB" < "$f"
   fi
-done
+done < <(printf '%s\n' "${files[@]}" | sort)
 echo "✓ Migrations applied to [$DB]."

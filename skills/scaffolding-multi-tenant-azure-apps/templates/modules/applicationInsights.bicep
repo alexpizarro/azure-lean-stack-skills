@@ -1,0 +1,1 @@
+../../../scaffolding-azure-bicep-infrastructure/templates/infra/modules/applicationInsights.bicep

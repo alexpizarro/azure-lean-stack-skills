@@ -7,9 +7,9 @@ description: Routes Azure web app work (scaffold, deploy, troubleshoot, evolve) 
 
 Thin router for Azure app deployments. Holds no domain knowledge of its own — every task is delegated to a single-purpose sub-skill or to Microsoft's `azure-skills` plugin.
 
-**Stack defaults:** React 19 + TypeScript | Azure Functions v4 (Node 22) | Azure SQL Serverless | Bicep IaC | GitHub Actions OIDC | **branch-per-environment**
+**Stack defaults:** React 19 + Vite 8 + TypeScript | Azure Functions v4 (Node 22, CommonJS) | Azure SQL Serverless (or Basic) | Bicep IaC | GitHub Actions OIDC (`azure/login@v3`) | **branch-per-environment**
 
-**Last verified:** May 2026
+**Last verified:** 2026-09-14 — see [references/stack-versions.md](references/stack-versions.md) for every pinned version and API version.
 
 ---
 
@@ -38,11 +38,14 @@ Identify the user's task, then delegate. Never inline domain knowledge from a su
 | "Blob storage cost" / "lifecycle rules" / "tier to cool/cold" / "delete old blobs" | [optimizing-azure-blob-storage-cost](../optimizing-azure-blob-storage-cost/SKILL.md) |
 | "Transactional email" / "ACS email" / "send email from Azure" | [adding-azure-communication-services-email](../adding-azure-communication-services-email/SKILL.md) |
 | "Add observability" / "App Insights" / "metric alerts" / "5xx alerts" | [instrumenting-azure-app-insights](../instrumenting-azure-app-insights/SKILL.md) |
+| "Managed identity" / "kill the SQL password / account key" / "secretless auth" / "user-delegation SAS" / "MI for SQL + Blob" / security review flags a stored secret | [securing-azure-sql-and-storage-with-managed-identity](../securing-azure-sql-and-storage-with-managed-identity/SKILL.md) |
 | "Multi-tenant" / "one RG per customer" / "per-tenant isolation" | [scaffolding-multi-tenant-azure-apps](../scaffolding-multi-tenant-azure-apps/SKILL.md) |
 | "Recurring trigger" / "schedule" / "Logic App" / "Power-Automate-like flow" / "ping every N minutes" | [scheduling-with-azure-logic-apps-consumption](../scheduling-with-azure-logic-apps-consumption/SKILL.md) |
 | "Run locally" / "offline" / "docker" / "local SQL" / "Azurite" / "seed local data" / "set up dev environment" | [developing-azure-apps-locally](../developing-azure-apps-locally/SKILL.md) |
 | "Reduce cost" / "audit SKUs" / "stay on free tier" / "consumption-only" | [applying-azure-cost-guardrails](../applying-azure-cost-guardrails/SKILL.md) |
-| "Deploy failed" / "diagnose this error" / "AADSTS70021" / "BCP258" / "LocationNotAvailable" | [diagnosing-azure-deployment-failures](../diagnosing-azure-deployment-failures/SKILL.md) |
+| "Deploy failed" / "diagnose this error" / "AADSTS70021" / "BCP258" / "LocationNotAvailable" / "bill jumped" | [diagnosing-azure-deployment-failures](../diagnosing-azure-deployment-failures/SKILL.md) |
+| "Retire / delete a Container App" / "it came back after deploy" / "stuck at 1 replica" | [deploying-azure-container-apps](../deploying-azure-container-apps/SKILL.md) retirement checklist + [applying-azure-cost-guardrails](../applying-azure-cost-guardrails/SKILL.md) `check-live-replicas.sh` |
+| "Next.js SSR/ISR" / "app bundle over 500 MB" / "needs middleware" | Not SWA. Container Apps for Next.js with middleware; App Service B1 for ISR that outgrew SWA (see the hosting table in [deploying-azure-static-web-apps](../deploying-azure-static-web-apps/SKILL.md)) |
 | "I learned something" / "promote a learning to gotchas" / "capture this lesson" | [curating-azure-deployment-learnings](../curating-azure-deployment-learnings/SKILL.md) |
 
 ### When to delegate to Microsoft's azure-skills
@@ -58,8 +61,9 @@ This skill is **complementary** to Microsoft's [azure-skills](https://github.com
 | Entra app registration mechanics | `entra-app-registration` |
 | Enterprise infra planning | `azure-enterprise-infra-planner` |
 | Quota / region availability checks | `azure-quotas` |
+| Azure Functions-specific setup / diagnostics / doctor | Microsoft's separate `azure-functions-skills` (preview, `npx @azure/functions-skills install`) — complements our FC1 skill |
 
-This skill owns: the opinionated low-cost scaffold, the gotcha catalogue, end-to-end CI/CD workflows, and the learnings-feedback loop.
+This skill owns: the opinionated low-cost scaffold, the gotcha catalogue (56 entries), end-to-end CI/CD workflows, the cost guardrails, and the learnings-feedback loop.
 
 ---
 
@@ -86,7 +90,8 @@ When a user wants a complete new Azure app:
 3. Read [managing-azure-sql-migrations/SKILL.md](../managing-azure-sql-migrations/SKILL.md) for the migration system.
 4. Read [deploying-azure-static-web-apps/SKILL.md](../deploying-azure-static-web-apps/SKILL.md) for SWA specifics.
 5. Read [applying-azure-cost-guardrails/SKILL.md](../applying-azure-cost-guardrails/SKILL.md) to verify defaults are consumption-priced.
-6. Optionally read [instrumenting-azure-app-insights/SKILL.md](../instrumenting-azure-app-insights/SKILL.md) for observability.
+6. Read [securing-azure-sql-and-storage-with-managed-identity/SKILL.md](../securing-azure-sql-and-storage-with-managed-identity/SKILL.md) — MI is the DEFAULT data-plane auth for new SQL + Blob deployments (provision the Entra admin + MI DB user + storage RBAC and ship the flags on from day one; password/key retained as rollback only).
+7. Optionally read [instrumenting-azure-app-insights/SKILL.md](../instrumenting-azure-app-insights/SKILL.md) for observability.
 
 If a deploy then fails, route to [diagnosing-azure-deployment-failures/SKILL.md](../diagnosing-azure-deployment-failures/SKILL.md).
 
@@ -107,6 +112,8 @@ git checkout production && git merge test -m "Release to prod: <summary>" && git
 git checkout main
 ```
 
-Watch progress: `gh run list --limit 4` then `gh run watch <run-id>`.
+Watch progress: `gh run list --limit 4` then `gh run watch <run-id>`. Dispatching by hand? `gh workflow run <file> --ref test` — OIDC credentials are branch-scoped, so a dispatch from `main` fails `AADSTS70021`.
+
+**A green run proves the app is up, not that this build is live.** On 2026-09-07 two prod runs went green while three new routes 404'd at the origin. For anything beyond the SWA scaffold, stamp a `build-info.json` (commit SHA, run id) into the bundle, fetch it from the deployed host after the deploy step, and fail the run if the SHA doesn't match; on Container Apps and Jobs assert the image tag instead of curling a URL.
 
 **Need a new isolated environment?** (Customer demo, UAT, feature branch with its own Azure stack.) Create the branch, run [`configuring-azure-oidc-for-github-actions`](../configuring-azure-oidc-for-github-actions/SKILL.md) with the new branch name, push. Ten minutes end to end.

@@ -1,6 +1,6 @@
 // Reusable storage account module.
 // Used by:
-//   - functionApp.bicep: runtime host storage + deployment blob container
+//   - flexConsumption.bicep: runtime host storage + deployment blob container
 //   - Future: temporary image upload storage (add a second container)
 //
 // The Flex Consumption Function App authenticates via Managed Identity,
@@ -14,7 +14,7 @@ param tags object = {}
 // Convention: 'app-package-{funcAppName}' (Azure Functions runtime requirement)
 param funcAppName string = ''
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   name: storageAccountName
   location: location
   tags: tags
@@ -27,14 +27,14 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
-resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01' = {
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' = {
   parent: storageAccount
   name: 'default'
 }
 
 // Deployment container for the Flex Consumption Function App.
 // The runtime uploads the app zip here during deployment.
-resource deployContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = if (!empty(funcAppName)) {
+resource deployContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = if (!empty(funcAppName)) {
   parent: blobService
   name: 'app-package-${funcAppName}'
   properties: {

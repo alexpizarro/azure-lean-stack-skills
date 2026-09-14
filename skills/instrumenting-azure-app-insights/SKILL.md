@@ -44,7 +44,7 @@ App Insights component owns:
 The single most important setting. Without it, a runaway log loop can ingest 100+ GB and bill hundreds of dollars overnight.
 
 ```bicep
-resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+resource workspace 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   properties: {
     sku: { name: 'PerGB2018' }
     retentionInDays: 30
@@ -90,7 +90,7 @@ Tune thresholds per app. The defaults are conservative — most low-traffic apps
 
 ## Wiring the connection string
 
-The Bicep outputs the connection string. The workflow sets it as a SWA / Function App / Container App setting:
+The Bicep outputs the connection string. The scaffolded `deploy-*.yml` workflows set it on the SWA automatically when `deployObservability` is on; for other hosts:
 
 ```bash
 # SWA
@@ -107,6 +107,8 @@ The SDK auto-detects this env var and starts emitting telemetry.
 ## Auto-instrumentation in code
 
 ### Azure Functions (Node 22)
+
+`@azure/monitor-opentelemetry` (1.20.x, Node ≥ 22) is the Azure Monitor OpenTelemetry distro; add `@azure/functions-opentelemetry-instrumentation` for per-invocation traces. `useAzureMonitor()` must run **before any other import** or early telemetry is lost.
 
 ```typescript
 // api/src/index.ts — at the top, before any other imports

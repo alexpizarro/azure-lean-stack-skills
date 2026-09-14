@@ -14,18 +14,18 @@ Run the whole app on `localhost` — API + SQL + blob storage — with **no depe
 | Mode | Command | Use for |
 |------|---------|---------|
 | **Fully offline** (this skill) | `bash scripts/up.sh` then `npm start` + `npm run dev` | Backend work, schema changes, fast iteration, no Azure cost |
-| **Frontend against live test backend** | `cd frontend && npm run dev:test` | UI-only work that needs real test data; no local API/SQL |
+| **Frontend against live test backend** | `cd frontend && npm run dev:test` | UI-only work that needs real test data; no local API/SQL. The scaffold ships this script — it sets `VITE_PROXY_TARGET` to the test SWA hostname, which `vite.config.ts` reads. Never point it at prod. |
 
 Prefer fully-offline for anything touching the API, SQL, or storage.
 
 ## The offline stack
 
 - **SQL Server 2022** in Docker (`mcr.microsoft.com/mssql/server:2022-latest`) — the same engine Azure SQL is built on. "Serverless" is an Azure *compute tier*, not a local concept; the T-SQL engine is identical, so migrations and queries behave the same locally as in Azure.
-- **Azurite** (`mcr.microsoft.com/azure-storage/azurite`) — local Azure Blob emulator. Blobs stream from `http://127.0.0.1:10000` instead of Azure Storage.
+- **Azurite** (`mcr.microsoft.com/azure-storage/azurite:3.37.0`, pinned) — local Azure Blob emulator. Blobs stream from `http://127.0.0.1:10000` instead of Azure Storage.
 
 Both run from [templates/docker-compose.yml](templates/docker-compose.yml).
 
-> **Apple Silicon:** the SQL Server image is amd64. Enable Docker Desktop → Settings → General → **"Use Rosetta for x86/amd64 emulation"**. (Azure SQL Edge was retired 2025-09 and dropped arm64, so `mssql/server` under Rosetta is the supported high-fidelity choice.)
+> **Apple Silicon:** the SQL Server image is amd64. Enable Docker Desktop → Settings → General → **"Use Rosetta for x86/amd64 emulation"**. (Azure SQL Edge was retired 2025-09 and dropped arm64, so `mssql/server` under Rosetta is the supported high-fidelity choice.) Stay on `2022-latest` — SQL Server 2025 RTM needs AVX, which Docker Desktop's emulation lacks, and crashes on start (CU1+ fixes it). If you run two projects, map the second on host port 1434.
 
 ## Workflow checklist
 

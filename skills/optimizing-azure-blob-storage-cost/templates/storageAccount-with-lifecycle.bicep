@@ -34,7 +34,7 @@ param createBrandingContainer bool = false
 @description('Additional private container names to create.')
 param privateContainers array = ['data']
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   name: name
   location: location
   tags: tags
@@ -49,7 +49,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
 }
 
-resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' = {
   parent: storageAccount
   name: 'default'
   properties: {
@@ -68,28 +68,28 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01'
 }
 
 // Always-create temp containers (private)
-resource tempContainers 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = [for prefix in tempPrefixes: {
+resource tempContainers 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = [for prefix in tempPrefixes: {
   parent: blobService
   name: replace(prefix, '/', '')
   properties: { publicAccess: 'None' }
 }]
 
 // Private content containers
-resource privateContainerResources 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = [for c in privateContainers: {
+resource privateContainerResources 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = [for c in privateContainers: {
   parent: blobService
   name: c
   properties: { publicAccess: 'None' }
 }]
 
 // Optional public-read branding container
-resource brandingContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = if (createBrandingContainer) {
+resource brandingContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = if (createBrandingContainer) {
   parent: blobService
   name: 'branding'
   properties: { publicAccess: 'Blob' }
 }
 
 // Lifecycle policy
-resource lifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
+resource lifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@2024-01-01' = {
   parent: storageAccount
   name: 'default'
   properties: {

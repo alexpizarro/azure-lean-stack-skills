@@ -1,0 +1,34 @@
+{
+  "properties": {
+    "template": {
+      "scale": {
+        "minReplicas": 0,
+        "maxReplicas": 3,
+        "cooldownPeriod": 300,
+        "pollingInterval": 30,
+        "rules": [
+          {
+            "name": "http-scale",
+            "http": {
+              "metadata": {
+                "concurrentRequests": "20"
+              }
+            }
+          },
+          {
+            "name": "class-night-warm",
+            "custom": {
+              "type": "cron",
+              "metadata": {
+                "timezone": "Australia/Sydney",
+                "start": "45 17 * * 2",
+                "end": "30 23 * * 2",
+                "desiredReplicas": "1"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

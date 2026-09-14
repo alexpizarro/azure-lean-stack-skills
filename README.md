@@ -2,7 +2,7 @@
 
 **Azure apps that cost nothing when nobody's using them.**
 
-A Claude Code skill pack for building React + Azure Functions + SQL web apps the lean way — scale-to-zero defaults, branch-per-environment CI/CD, and 37+ documented gotchas so Claude Code can actually deploy to Azure on the first try.
+A Claude Code skill pack for building React + Azure Functions + SQL web apps the lean way — scale-to-zero defaults that are audited and alerted, branch-per-environment CI/CD, managed identity wherever the host supports it, and 56 documented gotchas so Claude Code can actually deploy to Azure on the first try.
 
 ---
 
@@ -29,8 +29,8 @@ git push origin test
 
 That's it. Idle cost: ~$0. Light-traffic cost: ~$5/month. Full cost table below.
 
-> **Pin to a specific version** for stable installs across the v2 → v3 jump:
-> `claude plugin install alexpizarro/azure-lean-stack-skills@v2.1.0`
+> **Pin to a specific version** for stable installs:
+> `claude plugin install alexpizarro/azure-lean-stack-skills@v2.3.0`
 
 ---
 
@@ -53,14 +53,18 @@ So I built this skill pack. **Azure Lean Stack.** Every pattern in here is prove
 ```
 ~$0  idle cost for the whole stack
 ~$5  monthly cost at light traffic
-~14  composable Claude Code skills
-~37  documented gotchas with verified fixes
-~3   real production projects that prove every pattern
+ 17  composable Claude Code skills
+ 56  documented gotchas with verified fixes
+  5  real production projects that prove every pattern
 ```
 
 **Local → test → prod, one branch per tier** — `main` runs a fully-offline local stack (Docker SQL + Azurite, no Azure cost); push to `test` → test env; push to `production` → prod env. No GitHub Environments to configure, no deploy approvals to set up, no manual `terraform apply` from a laptop.
 
-**Free tier by default** — Static Web Apps Free, SQL Serverless with auto-pause, Container Apps scale-to-zero, Application Insights with daily quota cap, Storage with lifecycle rules. Pay for what you actually use.
+**Free tier by default** — Static Web Apps Free, SQL Serverless with auto-pause (or flat Basic when the DB is polled), Container Apps scale-to-zero, Application Insights with daily quota cap, Storage with lifecycle rules. Pay for what you actually use.
+
+**Scale-to-zero that is enforced, not assumed** — three audit scripts (Bicep SKUs, app-source anti-patterns, live replica sweep), a `cooldownPeriod` that stays at 300 s, KEDA cron warm windows instead of `minReplicas: 1`, and a Bicep template for an RG budget plus a "stuck-warm" alert. Three real idle-burn incidents (~A$240/month) taught every rule in it.
+
+**Secretless where the host allows it** — on Flex Consumption and Container Apps the compute's managed identity authenticates to SQL (Entra token) and Blob (user-delegation SAS), with the password and account key kept only as rollback. SWA managed functions (the Free-tier default) have no managed identity, so that path keeps the connection string as an app setting — the production-readiness table below says when to move.
 
 **Scale up when you need to** — every default is tunable. When traffic justifies it, flip the parameter file and redeploy.
 
@@ -70,15 +74,16 @@ So I built this skill pack. **Azure Lean Stack.** Every pattern in here is prove
 
 | Layer | Default | Cost when idle |
 |-------|---------|---------------|
-| Frontend | React 19 + Vite 6 on Static Web Apps **Free** | $0 |
-| API | Azure Functions v4 (Node 22) — SWA managed functions | $0 |
-| Database | Azure SQL Serverless `GP_S_Gen5_1`, auto-pause at 15 min | ~$0.10/mo (1GB cap) |
+| Frontend | React 19 + Vite 8 on Static Web Apps **Free** | $0 |
+| API | Azure Functions v4 (Node 22, CommonJS) — SWA managed functions, or Flex Consumption when you need triggers / managed identity | $0 |
+| Database | Azure SQL Serverless `GP_S_Gen5_1`, auto-pause at 15 min — or flat Basic (~$5/mo) when the DB is small and polled | ~$0.10/mo (1GB cap) |
 | Background jobs | Container Apps Jobs with `minReplicas: 0` | $0 |
 | Scheduled tasks | Logic Apps Consumption | $0.22/mo at 5-min cadence |
-| Email | Azure Communication Services Email | $0 (first 100/day free) |
+| Email | Azure Communication Services Email | ~$0.00025/email (no free tier; ~$1/mo at 5k/mo) |
 | Observability | Application Insights with `dailyQuotaGb: 1` | <$2/mo |
 | Storage | Blob `Standard_LRS` + lifecycle rules (Hot→Cool@60d→Cold@180d) | ~$0.02/GB/mo |
-| CI/CD | GitHub Actions with OIDC (no client secrets) | $0 |
+| CI/CD | GitHub Actions with OIDC (`azure/login@v3`, no client secrets, no third-party deploy actions) | $0 |
+| Cost backstop | Consumption budget + stuck-warm alert (`costGuardrails.bicep`) | ~$0.10/alert/mo |
 
 A typical low-traffic prototype runs at **under $5/month total**.
 
@@ -93,6 +98,7 @@ When you ask Claude to scaffold a new app, it routes through these sub-skills in
 3. [`managing-azure-sql-migrations`](skills/managing-azure-sql-migrations/SKILL.md) — sets up the migration system
 4. [`deploying-azure-static-web-apps`](skills/deploying-azure-static-web-apps/SKILL.md) — generates the React + Functions code
 5. [`applying-azure-cost-guardrails`](skills/applying-azure-cost-guardrails/SKILL.md) — audits the Bicep for cost regressions before first deploy
+6. [`securing-azure-sql-and-storage-with-managed-identity`](skills/securing-azure-sql-and-storage-with-managed-identity/SKILL.md) — when the API runs on Flex Consumption or Container Apps, provisions managed-identity auth from day one
 
 You don't have to invoke these by name. Describe what you want — *"scaffold an Azure app with SQL and storage"*, *"set up OIDC"*, *"add a recurring scheduler"* — and Claude picks the right sub-skill via [`orchestrating-azure-deployments`](skills/orchestrating-azure-deployments/SKILL.md).
 
@@ -119,7 +125,7 @@ Need a new isolated environment? `git checkout -b acme-demo`, set up one OIDC fe
 
 ---
 
-## The 16 skills
+## The 17 skills
 
 | Skill | When Claude uses it |
 |-------|--------------------|
@@ -135,9 +141,10 @@ Need a new isolated environment? `git checkout -b acme-demo`, set up one OIDC fe
 | [`optimizing-azure-blob-storage-cost`](skills/optimizing-azure-blob-storage-cost/SKILL.md) | Lifecycle rules, CORS for SAS+Range, tier ageing |
 | [`adding-azure-communication-services-email`](skills/adding-azure-communication-services-email/SKILL.md) | Transactional email (100/day free) |
 | [`instrumenting-azure-app-insights`](skills/instrumenting-azure-app-insights/SKILL.md) | Workspace-based App Insights with daily cap + alerts |
+| [`securing-azure-sql-and-storage-with-managed-identity`](skills/securing-azure-sql-and-storage-with-managed-identity/SKILL.md) | Entra-token SQL auth + user-delegation SAS via the compute's managed identity (FC1 / Container Apps); flag-gated with password/key as rollback |
 | [`scaffolding-multi-tenant-azure-apps`](skills/scaffolding-multi-tenant-azure-apps/SKILL.md) | One RG per tenant on a shared subscription |
-| [`applying-azure-cost-guardrails`](skills/applying-azure-cost-guardrails/SKILL.md) | Consumption-first defaults + a Bicep auditor script |
-| [`diagnosing-azure-deployment-failures`](skills/diagnosing-azure-deployment-failures/SKILL.md) | 37+ gotcha catalogue with verified fixes |
+| [`applying-azure-cost-guardrails`](skills/applying-azure-cost-guardrails/SKILL.md) | 15 guardrails, three audit scripts (Bicep, app source, live replicas), budget + stuck-warm alert template |
+| [`diagnosing-azure-deployment-failures`](skills/diagnosing-azure-deployment-failures/SKILL.md) | 56-entry gotcha catalogue with verified fixes |
 | [`curating-azure-deployment-learnings`](skills/curating-azure-deployment-learnings/SKILL.md) | Captures field learnings and promotes recurring ones to gotchas |
 
 See [`RECIPES.md`](RECIPES.md) for working patterns lifted from real projects.
@@ -169,7 +176,7 @@ Why this works:
 
 ## How this complements Microsoft's Azure Skills plugin
 
-Microsoft published their official [Azure Skills plugin](https://github.com/microsoft/azure-skills) with 25 skills + 200+ MCP tools. They cover the live Azure surface — querying resources, running cost analysis, doing RBAC audits.
+Microsoft published their official [Azure Skills plugin](https://github.com/microsoft/azure-skills) (~27 skills + 200+ MCP tools; `/plugin install azure@claude-plugins-official`) and a Functions-only [`azure-functions-skills`](https://github.com/Azure/azure-functions-skills) pack (preview). They cover the live Azure surface — querying resources, running cost analysis, doing RBAC audits, scaffolding a bare Function App.
 
 This pack complements that with opinionated, proven patterns:
 
@@ -186,13 +193,14 @@ Install both. Claude Code uses Microsoft's for live diagnostics; Azure Lean Stac
 
 ## Architecture decisions (non-negotiable)
 
-1. **Branch-per-environment.** `main` = dev only; `test` and `production` (and any other branch) map 1:1 to Azure resource groups via branch-scoped OIDC.
-2. **SWA managed functions by default.** Free tier. HTTP only. Switch to FC1 only when you need timer/queue/AI triggers.
-3. **SQL Serverless.** `GP_S_Gen5_1`, auto-pauses at 15 min idle.
-4. **OIDC auth.** Never a client secret in CI.
+1. **Branch-per-environment.** `main` = local dev only; `test` and `production` (and any other branch) map 1:1 to Azure resource groups via branch-scoped OIDC.
+2. **SWA managed functions by default.** Free tier. HTTP only. Switch to FC1 (same CommonJS code) when you need timer/queue/AI triggers or managed identity.
+3. **SQL Serverless by default, Basic when polled.** `GP_S_Gen5_1` auto-pauses at 15 min idle; a small DB hit on a steady cadence is cheaper on flat Basic.
+4. **OIDC auth.** Never a client secret in CI. CI principals are Contributor-only; RBAC grants are applied once out-of-band.
 5. **JSON parameter files.** `.parameters.json` not `.bicepparam` (needs inline `--parameters` overrides).
 6. **SWA location is `eastasia`.** Hard-coded; `australiaeast` doesn't support `Microsoft.Web/staticSites`.
-7. **Every pattern is proven in a real project.** Nothing in this pack is fabricated — if no shipping project uses it, it doesn't get added.
+7. **No third-party marketplace action in the deploy path** when `az` can do the job (`Azure/functions-action` went dark for five days in June 2026).
+8. **Every pattern is proven in a real project.** Nothing in this pack is fabricated — if no shipping project uses it, it doesn't get added.
 
 ---
 
@@ -203,12 +211,13 @@ Azure Lean Stack is consumption-priced and optimised for fast iteration. For rea
 | Priority | Gap | Upgrade path |
 |----------|-----|-------------|
 | 1 | No authentication | Entra ID on SWA, or APIM with JWT validation |
-| 2 | SQL password auth | Managed Identity with `db_datareader`/`db_datawriter` |
+| 2 | SQL password / storage key in app settings (SWA managed functions can't use MI) | Move the API to FC1 and apply [`securing-azure-sql-and-storage-with-managed-identity`](skills/securing-azure-sql-and-storage-with-managed-identity/SKILL.md) |
 | 3 | Over-scoped SPs | Scope from subscription to resource group |
 | 4 | Public SQL access | Private endpoint + VNet integration |
-| 5 | No observability by default | Set `deployObservability: true` (skill: `instrumenting-azure-app-insights`) |
-| 6 | SQL cold starts on idle | Upgrade from serverless to provisioned tier |
+| 5 | No observability by default | Set `deployObservability: true` in the parameter file (wired through Bicep + workflow) |
+| 6 | SQL cold starts on idle | `sqlSku: 'Basic'` (flat ~$5/mo) or a provisioned tier |
 | 7 | No WAF | Azure Front Door + WAF policy |
+| 8 | No Azure-native cost alert | Deploy `applying-azure-cost-guardrails/templates/costGuardrails.bicep` once per environment |
 
 ---
 

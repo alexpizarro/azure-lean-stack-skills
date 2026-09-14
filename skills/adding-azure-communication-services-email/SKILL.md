@@ -5,7 +5,7 @@ description: Adds transactional email to an Azure web app via Azure Communicatio
 
 # Adding Azure Communication Services Email
 
-Transactional email via Azure Communication Services. **Free tier: 100 emails/day**, then $0.00025/email. Cheaper than SendGrid for low-volume projects.
+Transactional email via Azure Communication Services. Pay-as-you-go: **$0.00025/email + $0.00012/MB**, no free allowance — but 5,000 emails/month is about US$1.25, cheaper than any SendGrid tier for low-volume projects. Mind the **rate limits**: an Azure-managed domain is capped at **10 emails/hour** (not raisable); a verified custom domain gets 100/hour and 30/minute, raisable by support ticket.
 
 ## When to use ACS Email
 
@@ -20,7 +20,7 @@ Transactional email via Azure Communication Services. **Free tier: 100 emails/da
 ### 1. `location: 'global'` (literal string, not a real Azure region)
 
 ```bicep
-resource emailService 'Microsoft.Communication/emailServices@2023-04-01' = {
+resource emailService 'Microsoft.Communication/emailServices@2025-09-01' = {
   name: emailServiceName
   location: 'global'                  // ← NOT 'australiaeast', NOT location param
   properties: { dataLocation: 'Australia' }
@@ -62,14 +62,14 @@ ACS resources have an awkward circular dependency: the ACS resource needs to kno
 
 ```bicep
 // 1. Email service (no dependencies)
-resource emailService 'Microsoft.Communication/emailServices@2023-04-01' = {
+resource emailService 'Microsoft.Communication/emailServices@2025-09-01' = {
   name: emailServiceName
   location: 'global'
   properties: { dataLocation: 'Australia' }
 }
 
 // 2. Domain — child of emailService
-resource emailDomain 'Microsoft.Communication/emailServices/domains@2023-04-01' = {
+resource emailDomain 'Microsoft.Communication/emailServices/domains@2025-09-01' = {
   parent: emailService
   name: 'AzureManagedDomain'        // or your custom domain
   location: 'global'
@@ -80,7 +80,7 @@ resource emailDomain 'Microsoft.Communication/emailServices/domains@2023-04-01' 
 }
 
 // 3. Comms service — links to the domain via linkedDomains
-resource acs 'Microsoft.Communication/communicationServices@2023-04-01' = {
+resource acs 'Microsoft.Communication/communicationServices@2025-09-01' = {
   name: acsName
   location: 'global'
   properties: {
@@ -171,13 +171,13 @@ To send from `noreply@yourdomain.com`, set `domainManagement: 'CustomerManaged'`
 
 The Azure-managed domain is fine for prototypes and internal tools.
 
-## Pricing
+## Pricing and limits
 
-- 100 emails/day free
-- $0.00025/email above that
-- Attachments billed extra at $0.0002/MB
+- $0.00025/email + $0.00012/MB transferred (headers, body, attachments) — no free allowance
+- Rate limits per subscription: Azure-managed domain **10/hour, 5/minute** (fixed); custom domain **100/hour, 30/minute** (raisable via a quota request, typically ≤72 h)
+- 50 recipients per message, 10 MB per request
 
-For a 1000-user app doing ~5 transactional emails/user/month (5k/month), cost is ~$1.25/month.
+For a 1000-user app doing ~5 transactional emails/user/month (5k/month), cost is ~$1.25/month. Verify a custom domain before you rely on more than a handful of emails an hour.
 
 ## Composes with
 

@@ -1,0 +1,19 @@
+{
+  "skill": "deploying-azure-container-apps",
+  "query": "We replaced the enrichment HTTP Container App with a Container Apps Job last week. Delete the old app so it stops costing money.",
+  "context": "Azure Lean Stack project with deploy-test.yml and deploy-prod.yml. Both workflows still contain an 'az containerapp update --name trg-enrichment-aca' step followed by 'curl https://…/health' as a deploy verification. The app has three revisions.",
+  "expected_behavior": [
+    "Claude follows the retirement checklist: deactivate EVERY active revision (using --all to see them), remove the app from Bicep, then grep .github/workflows and deploy scripts for the app name",
+    "Claude finds and removes the 'az containerapp update' and health-curl steps in BOTH workflows and explains CI would otherwise recreate and re-wake the app on the next deploy (Guardrail #13, gotcha #43)",
+    "Claude replaces the health-curl verification with an assertion on the Job's image tag (never a URL probe)",
+    "Claude adds a network-free structural test that fails the build if the app name reappears in workflows",
+    "Claude says to prove the saving in per-resource daily billing (Guardrail #14), not by screenshotting config",
+    "Claude does NOT just run 'az containerapp delete' and call it done"
+  ],
+  "ground_truth": {
+    "must_invoke": ["deploying-azure-container-apps", "applying-azure-cost-guardrails"],
+    "must_mention": ["revision deactivate", "--all", "grep", ".github/workflows", "image tag", "billing"],
+    "must_run_commands": ["az containerapp revision list", "az containerapp revision deactivate", "grep"],
+    "must_avoid_commands": ["curl https://", "az containerapp update --name trg-enrichment-aca"]
+  }
+}

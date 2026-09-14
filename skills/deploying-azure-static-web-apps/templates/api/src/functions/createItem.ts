@@ -15,6 +15,12 @@ async function createItem(req: HttpRequest, context: InvocationContext): Promise
       return { status: 400, jsonBody: { error: 'name is required and must be a non-empty string' } };
     }
 
+    // Mock when the DB isn't configured — the write is skipped, not faked as persisted.
+    if (!process.env.SQL_CONNECTION_STRING) {
+      context.warn('SQL_CONNECTION_STRING not set — skipping DB write');
+      return { status: 201, jsonBody: { item: { Id: 0, Name: body.name.trim(), CreatedAt: new Date().toISOString() }, mock: true } };
+    }
+
     const items = await query<Item>(
       'INSERT INTO dbo.Items (Name) OUTPUT INSERTED.Id, INSERTED.Name, INSERTED.CreatedAt VALUES (@name)',
       [{ name: 'name', value: body.name.trim() }]
